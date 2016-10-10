@@ -24,7 +24,7 @@ my $stomper = AnyEvent::Stomper->new(
   on_error => sub {
     my $err   = shift;
     my $frame = shift;
-    
+
     print Dumper($frame);
   }
 );

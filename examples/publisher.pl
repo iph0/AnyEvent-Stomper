@@ -37,17 +37,17 @@ $timer = AE::timer( 0, 1,
       'auto-delete' => 'false',
       body          => 'foo' . $num++,
 
-#      sub {
-#        my $receipt = shift;
-#        my $err     = shift;
-#
-#        if ( defined $err ) {
-#          warn $err->message . "\n";
-#          return;
-#        }
-#
-#        print Dumper($receipt);
-#      }
+      sub {
+        my $receipt = shift;
+        my $err     = shift;
+
+        if ( defined $err ) {
+          warn $err->message . "\n";
+          return;
+        }
+
+        print Dumper($receipt);
+      }
     );
   },
 );
