@@ -34,7 +34,7 @@ my $cv = AE::cv;
 my $dst = '/queue/foo';
 
 $stomper->subscribe(
-  id          => 'myFoo',
+  id          => 1,
   destination => $dst,
   ack         => 'client',
 
@@ -82,7 +82,7 @@ my $on_signal = sub {
   print "Stopped\n";
 
   $stomper->unsubscribe(
-    id          => 'myFoo',
+    id          => 1,
     destination => $dst,
 
     sub {

@@ -29,7 +29,7 @@ use constant {
   # Default values
   D_HOST           => 'localhost',
   D_PORT           => 61613,
-  D_ACCEPT_VERSION => '1.2',
+  D_ACCEPT_VERSION => '1.0,1.1,1.2',
   D_HEART_BEAT     => [ 0, 0 ],
 
   %ERROR_CODES,
@@ -474,18 +474,17 @@ sub _push_write {
     $self->{_pending_receipts}{CONNECTED} = $cmd;
   }
 
+  unless ( defined $cmd->{body} ) {
+    $cmd->{body} = '';
+  }
+  unless ( defined $headers->{'content-length'} ) {
+    $headers->{'content-length'} = length( $cmd->{body} );
+  }
   my $frame_str = uc( $cmd->{name} ) . EOL;
   while ( my ( $name, $value ) = each %{$headers} ) {
     $name  = _escape($name);
     $value = _escape($value);
     $frame_str .= $name . ':' . $value . EOL;
-  }
-
-  unless ( defined $cmd->{body} ) {
-    $cmd->{body} = '';
-  }
-  unless ( defined $headers->{'content-length'} ) {
-    $headers->{'content-length'} = length( $self->{body} );
   }
   $frame_str .= EOL . $cmd->{body} . "\0";
 
