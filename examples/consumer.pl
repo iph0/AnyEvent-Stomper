@@ -12,6 +12,7 @@ my $stomper = AnyEvent::Stomper->new(
   prot               => '61613',
   login              => 'guest',
   passcode           => 'guest',
+  heart_beat         => [ 5000, 5000 ],
 
   on_connect => sub {
     print "Connected to server\n";

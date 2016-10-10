@@ -35,7 +35,7 @@ $timer = AE::timer( 0, 1,
       persistent    => 'true',
       durable       => 'true',
       'auto-delete' => 'false',
-      body          => "foo\0" . $num++,
+      body          => 'foo' . $num++,
 
       sub {
         my $receipt = shift;

@@ -15,6 +15,7 @@ use AnyEvent::Stomper::Error;
 use AnyEvent;
 use AnyEvent::Handle;
 use Scalar::Util qw( looks_like_number blessed weaken );
+use List::Util qw( max );
 use Carp qw( croak );
 
 our %ERROR_CODES;
@@ -79,7 +80,6 @@ sub new {
   $self->{on_disconnect} = $params{on_disconnect};
 
   $self->connection_timeout( $params{connection_timeout} );
-  $self->read_timeout( $params{read_timeout} );
   $self->reconnect_interval( $params{reconnect_interval} );
   $self->on_error( $params{on_error} );
 
@@ -155,9 +155,7 @@ sub on_error {
     }
   }
 
-  foreach my $name ( qw( connection_timeout read_timeout
-      reconnect_interval ) )
-  {
+  foreach my $name ( qw( connection_timeout reconnect_interval ) ) {
     *{$name} = sub {
       my $self = shift;
 
@@ -198,6 +196,7 @@ sub _connect {
     on_prepare       => $self->_create_on_prepare,
     on_connect       => $self->_create_on_connect,
     on_connect_error => $self->_create_on_connect_error,
+    on_wtimeout      => $self->_create_on_wtimeout,
     on_rtimeout      => $self->_create_on_rtimeout,
     on_eof           => $self->_create_on_eof,
     on_error         => $self->_create_on_handle_error,
@@ -252,19 +251,24 @@ sub _create_on_connect_error {
   };
 }
 
+sub _create_on_wtimeout {
+  my $self = shift;
+
+  weaken($self);
+
+  return sub {
+    $self->{_handle}->push_write(EOL);
+  };
+}
+
 sub _create_on_rtimeout {
   my $self = shift;
 
   weaken($self);
 
   return sub {
-    if ( %{ $self->{_pending_receipts} } ) {
-      my $err = _new_error( 'Read timed out.', E_READ_TIMEDOUT );
-      $self->_disconnect($err);
-    }
-    else {
-      $self->{_handle}->rtimeout(undef);
-    }
+    my $err = _new_error( 'Read timed out.', E_READ_TIMEDOUT );
+    $self->_disconnect($err);
   };
 }
 
@@ -329,13 +333,11 @@ sub _create_on_read {
         undef $headers;
       }
       else {
-        # TODO got heart-beat EOLs
+        $handle->{rbuf} =~ s/^(?:${\(RE_EOL)})+//;
 
-        return unless $handle->{rbuf}
-            =~ s/(?:${\(RE_EOL)})*(.+?)(?:${\(RE_EOL)}){2}//s;
+        return unless $handle->{rbuf} =~ s/^(.+?)(?:${\(RE_EOL)}){2}//s;
 
         ( $cmd_name, my @header_tokens ) = split( m/(?::|${\(RE_EOL)})/, $1 );
-
         $headers = { map { _unescape($_) } @header_tokens };
 
         next;
@@ -451,15 +453,6 @@ sub _push_write {
   my $self = shift;
   my $cmd  = shift;
 
-  my $handle = $self->{_handle};
-
-  if ( defined $self->{read_timeout}
-    && !%{ $self->{_pending_receipts} } )
-  {
-    $handle->rtimeout_reset;
-    $handle->rtimeout( $self->{read_timeout} );
-  }
-
   my $headers = $cmd->{headers};
 
   if ( exists $SUBUNSUB_CMDS{ $cmd->{name} }
@@ -488,7 +481,7 @@ sub _push_write {
   }
   $frame_str .= EOL . $cmd->{body} . "\0";
 
-  $handle->push_write($frame_str);
+  $self->{_handle}->push_write($frame_str);
 
   return;
 }
@@ -496,31 +489,61 @@ sub _push_write {
 sub _login {
   my $self = shift;
 
-  weaken($self);
-  $self->{_login_state} = S_IN_PROGRESS;
+  my $handle      = $self->{_handle};
+  my ( $cx, $cy ) = @{ $self->{heart_beat} };
 
-  my %headers = ( 'accept-version' => D_ACCEPT_VERSION );
+  if ( $cy > 0 ) {
+    $handle->rtimeout_reset;
+    $handle->rtimeout( ( $cy / 1000 ) * 3 );
+  }
+
+  my %headers = (
+    'accept-version' => D_ACCEPT_VERSION,
+    'heart-beat'     => join( ',', $cx, $cy ),
+  );
   if ( defined $self->{login} ) {
-    $headers{login}    = $self->{login};
+    $headers{login} = $self->{login};
+  }
+  if ( defined $self->{passcode} ) {
     $headers{passcode} = $self->{passcode};
   }
   if ( defined $self->{vhost} ) {
     $headers{host} = $self->{vhost};
   }
-  $headers{'heart-beat'} = join( ',', @{ $self->{heart_beat} } );
+
+  weaken($self);
+  $self->{_login_state} = S_IN_PROGRESS;
 
   $self->_push_write(
     { name    => 'CONNECT',
       headers => \%headers,
 
       on_receipt => sub {
-        my $err = $_[1];
+        my $receipt = shift;
+        my $err     = shift;
 
         if ( defined $err ) {
           $self->{_login_state} = S_NEED_DO;
           $self->_abort($err);
 
           return;
+        }
+
+        my $headers = $receipt->headers;
+
+        if ( defined $headers->{'heart-beat'} ) {
+          my $handle      = $self->{_handle};
+          my ( $sx, $sy ) = split( /,/, $headers->{'heart-beat'} );
+
+          if ( $sx > 0 ) {
+            $handle->rtimeout_reset;
+            $handle->rtimeout( ( max( $cy, $sx ) / 1000 ) * 3 );
+          }
+
+          if ( $sy > 0 ) {
+            $handle->wtimeout_reset;
+            $handle->wtimeout( max( $cx, $sy ) / 1000 );
+          }
         }
 
         $self->{_login_state} = S_DONE;
