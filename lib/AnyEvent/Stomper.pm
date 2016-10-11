@@ -47,7 +47,8 @@ my %SUBUNSUB_CMDS = (
 );
 
 my %NEED_RECEIPT = (
-  CONNECT => 1,
+  CONNECT    => 1,
+  DISCONNECT => 1,
   %SUBUNSUB_CMDS,
 );
 
