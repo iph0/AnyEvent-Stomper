@@ -699,7 +699,7 @@ sub _process_error {
   my $frame = shift;
 
   my $headers = $frame->headers;
-  my $err     = _new_error( $headers->{message}, E_OPRN_ERROR );
+  my $err     = _new_error( $headers->{message}, E_OPRN_ERROR, $frame );
 
   my $cmd;
   if ( defined $headers->{'receipt-id'} ) {
@@ -707,19 +707,18 @@ sub _process_error {
   }
 
   if ( defined $cmd ) {
-    $cmd->{on_receipt}->( $frame, $err );
+    $cmd->{on_receipt}->( undef, $err );
   }
   else {
-    $self->_disconnect( $err, $frame );
+    $self->_disconnect($err);
   }
 
   return;
 }
 
 sub _disconnect {
-  my $self  = shift;
-  my $err   = shift;
-  my $frame = shift;
+  my $self = shift;
+  my $err  = shift;
 
   my $was_connected = $self->{_connected};
 
@@ -727,7 +726,7 @@ sub _disconnect {
     $self->{_handle}->destroy;
   }
   $self->_reset_internals;
-  $self->_abort( $err, $frame );
+  $self->_abort($err);
 
   if ( $was_connected && defined $self->{on_disconnect} ) {
     $self->{on_disconnect}->();
@@ -751,9 +750,8 @@ sub _reset_internals {
 }
 
 sub _abort {
-  my $self  = shift;
-  my $err   = shift;
-  my $frame = shift;
+  my $self = shift;
+  my $err  = shift;
 
   my @queued_commands = $self->_queued_commands;
   my %subs            = %{ $self->{_subs} };
@@ -769,17 +767,16 @@ sub _abort {
   }
 
   if ( defined $err ) {
-    my $err_msg  = $err->message;
-    my $err_code = $err->code;
+    my $err_msg   = $err->message;
+    my $err_code  = $err->code;
+    my $err_frame = $err->frame;
 
-    $self->{on_error}->( $err, $frame );
+    $self->{on_error}->($err);
 
     if ( %subs && $err_code != E_CONN_CLOSED_BY_CLIENT ) {
       foreach my $sub_id ( keys %subs ) {
-        my $err = _new_error(
-          qq{Subscription "$sub_id" lost: $err_msg},
-          $err_code
-        );
+        my $err = _new_error( qq{Subscription "$sub_id" lost: $err_msg},
+            $err_code, $err_frame );
 
         my $cmd = $subs{$sub_id};
         $cmd->{on_receipt}->( undef, $err );
@@ -788,7 +785,7 @@ sub _abort {
 
     foreach my $cmd (@queued_commands) {
       my $err = _new_error( qq{Operation "$cmd->{name}" aborted: $err_msg},
-          $err_code );
+          $err_code, $err_frame );
       $cmd->{on_receipt}->( undef, $err );
     }
   }

@@ -24,19 +24,17 @@ sub new {
   return $self;
 }
 
-sub command {
-  my $self = shift;
-  return $self->{command};
-}
+# Generate getters
+{
+  no strict qw( refs );
 
-sub headers {
-  my $self = shift;
-  return $self->{headers};
-}
-
-sub body {
-  my $self = shift;
-  return $self->{body};
+  foreach my $name ( qw( command headers body ) )
+  {
+    *{$name} = sub {
+      my $self = shift;
+      return $self->{$name};
+    }
+  }
 }
 
 sub decoded_body {

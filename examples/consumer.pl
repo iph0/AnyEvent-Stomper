@@ -5,7 +5,6 @@ use strict;
 use warnings;
 
 use AnyEvent::Stomper qw( :err_codes );
-use Data::Dumper;
 
 my $stomper = AnyEvent::Stomper->new(
   host       => 'localhost',

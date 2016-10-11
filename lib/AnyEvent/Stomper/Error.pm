@@ -19,26 +19,31 @@ our %ERROR_CODES = (
 
 
 sub new {
-  my $class    = shift;
-  my $err_msg  = shift;
-  my $err_code = shift;
+  my $class     = shift;
+  my $err_msg   = shift;
+  my $err_code  = shift;
+  my $err_frame = shift;
 
   my $self = bless {}, $class;
 
   $self->{message} = $err_msg;
   $self->{code}    = $err_code;
+  $self->{frame}   = $err_frame;
 
   return $self;
 }
 
-sub message {
-  my $self = shift;
-  return $self->{message};
-}
+# Generate getters
+{
+  no strict qw( refs );
 
-sub code {
-  my $self = shift;
-  return $self->{code};
+  foreach my $name ( qw( message code frame ) )
+  {
+    *{$name} = sub {
+      my $self = shift;
+      return $self->{$name};
+    }
+  }
 }
 
 1;
