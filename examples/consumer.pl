@@ -54,7 +54,7 @@ $stomper->subscribe(
       my $body    = $msg->body;
 
       $stomper->ack(
-        id => $headers->{'message-id'},
+        id => $headers->{ack},
 
         sub {
           my $receipt = shift;

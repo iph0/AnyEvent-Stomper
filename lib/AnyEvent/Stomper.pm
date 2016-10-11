@@ -12,7 +12,7 @@ use AnyEvent::Stomper::Error;
 
 use AnyEvent;
 use AnyEvent::Handle;
-use Scalar::Util qw( looks_like_number blessed weaken );
+use Scalar::Util qw( looks_like_number weaken );
 use List::Util qw( max );
 use Carp qw( croak );
 
@@ -21,7 +21,7 @@ our %ERROR_CODES;
 BEGIN {
   %ERROR_CODES = %AnyEvent::Stomper::Error::ERROR_CODES;
   our @EXPORT_OK   = keys %ERROR_CODES;
-  our %EXPORT_TAGS = ( err_codes => \@EXPORT_OK, );
+  our %EXPORT_TAGS = ( err_codes => \@EXPORT_OK );
 }
 
 use constant {
@@ -556,6 +556,7 @@ sub _login {
 
         $self->{_ready}      = 1;
         $self->{_session_id} = $headers->{session};
+
         $self->_process_input_queue;
       },
     }
@@ -607,15 +608,15 @@ sub _process_frame {
   elsif ( $frame->command eq 'RECEIPT' ) {
     $self->_process_receipt($frame);
   }
-  elsif ( $frame->command eq 'CONNECTED' ) {
-    $frame->headers->{'receipt-id'} = 'CONNECTED';
-    $self->_process_receipt($frame);
-  }
-  else {    # ERROR
+  elsif ( $frame->command eq 'ERROR' ) {
     if ( defined $self->{_pending_receipts}{CONNECTED} ) {
       $frame->headers->{'receipt-id'} = 'CONNECTED';
     }
     $self->_process_error($frame);
+  }
+  else {    # CONNECTED
+    $frame->headers->{'receipt-id'} = 'CONNECTED';
+    $self->_process_receipt($frame);
   }
 
   return;
@@ -671,6 +672,9 @@ sub _process_receipt {
     else {    # UNSUBSCRIBE
       delete $self->{_subs}{$sub_id};
     }
+  }
+  elsif ( $cmd->{name} eq 'DISCONNECT' ) {
+    $self->_disconnect;
   }
 
   $cmd->{on_receipt}->($frame);
