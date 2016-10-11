@@ -8,11 +8,11 @@ use AnyEvent::Stomper qw( :err_codes );
 use Data::Dumper;
 
 my $stomper = AnyEvent::Stomper->new(
-  host               => 'localhost',
-  prot               => '61613',
-  login              => 'guest',
-  passcode           => 'guest',
-  heart_beat         => [ 5000, 5000 ],
+  host       => 'localhost',
+  prot       => '61613',
+  login      => 'guest',
+  passcode   => 'guest',
+  heart_beat => [ 5000, 5000 ],
 
   on_connect => sub {
     print "Connected to server\n";
@@ -21,20 +21,15 @@ my $stomper = AnyEvent::Stomper->new(
   on_disconnect => sub {
     print "Disconnected from server\n";
   },
-
-  on_error => sub {
-    my $err   = shift;
-    my $frame = shift;
-
-    print Dumper($frame);
-  }
 );
 
 my $cv = AE::cv;
 
-my $dst = '/queue/foo';
+my $sub_id = 'foo';
+my $dst    = '/queue/foo';
 
 $stomper->subscribe(
+  id          => $sub_id,
   destination => $dst,
   ack         => 'client',
 
@@ -49,18 +44,17 @@ $stomper->subscribe(
         return;
       }
 
-      print qq{Subscribed to "$dst"\n};
+      print "Subscribed to $sub_id\n";
     },
 
     on_message => sub {
       my $frame = shift;
 
-      print 'Consumed: ' . $frame->body . "\n";
-
-      my $msg_id = $frame->headers->{'message-id'};
+      my $headers = $frame->headers;
+      my $body    = $frame->body;
 
       $stomper->ack(
-        id => $msg_id,
+        id => $headers->{'message-id'},
 
         sub {
           my $receipt = shift;
@@ -71,7 +65,7 @@ $stomper->subscribe(
             return;
           }
 
-          print "Acked\n",
+          print "Consumed: $body\n";
         }
       );
     },
@@ -82,6 +76,7 @@ my $on_signal = sub {
   print "Stopped\n";
 
   $stomper->unsubscribe(
+    id          => $sub_id,
     destination => $dst,
 
     sub {
@@ -95,7 +90,7 @@ my $on_signal = sub {
         return;
       }
 
-      print qq{Unsubscribed from "$dst"\n};
+      print "Unsubscribed from $sub_id\n";
 
       $cv->send;
     }
@@ -106,5 +101,3 @@ my $int_w  = AE::signal( INT  => $on_signal );
 my $term_w = AE::signal( TERM => $on_signal );
 
 $cv->recv;
-
-undef $stomper;

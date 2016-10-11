@@ -8,11 +8,11 @@ use AnyEvent::Stomper qw( :err_codes );
 use Data::Dumper;
 
 my $stomper = AnyEvent::Stomper->new(
-  host               => 'localhost',
-  prot               => '61613',
-  login              => 'guest',
-  passcode           => 'guest',
-  read_timeout       => '5',
+  host       => 'localhost',
+  prot       => '61613',
+  login      => 'guest',
+  passcode   => 'guest',
+  heart_beat => [ 5000, 5000 ],
 
   on_connect => sub {
     print "Connected to server\n";
@@ -33,11 +33,9 @@ $timer = AE::timer( 0, 1,
     my $body = 'foo' . $num++;
 
     $stomper->send(
-      destination   => '/queue/foo',
-      persistent    => 'true',
-      durable       => 'true',
-      'auto-delete' => 'false',
-      body          => $body,
+      destination => '/queue/foo',
+      persistent  => 'true',
+      body        => $body,
 
       sub {
         my $receipt = shift;
@@ -74,5 +72,3 @@ my $int_w  = AE::signal( INT  => $on_signal );
 my $term_w = AE::signal( TERM => $on_signal );
 
 $cv->recv;
-
-undef $stomper;
