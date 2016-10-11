@@ -48,10 +48,10 @@ $stomper->subscribe(
     },
 
     on_message => sub {
-      my $frame = shift;
+      my $msg = shift;
 
-      my $headers = $frame->headers;
-      my $body    = $frame->body;
+      my $headers = $msg->headers;
+      my $body    = $msg->body;
 
       $stomper->ack(
         id => $headers->{'message-id'},

@@ -26,10 +26,9 @@ BEGIN {
 
 use constant {
   # Default values
-  D_HOST           => 'localhost',
-  D_PORT           => 61613,
-  D_ACCEPT_VERSION => '1.0,1.1,1.2',
-  D_HEART_BEAT     => [ 0, 0 ],
+  D_HOST       => 'localhost',
+  D_PORT       => 61613,
+  D_HEART_BEAT => [ 0, 0 ],
 
   %ERROR_CODES,
 
@@ -472,7 +471,8 @@ sub _push_write {
     || defined $cmd->{need_receipt} )
   {
     unless ( defined $headers->{receipt} ) {
-      $headers->{receipt} = $self->{_receipt_seq}++;
+      $headers->{receipt} = $self->{_session_id} . '@@'
+          . $self->{_receipt_seq}++;
     }
     $self->{_pending_receipts}{ $headers->{receipt} } = $cmd;
   }
@@ -508,7 +508,7 @@ sub _login {
   }
 
   my %headers = (
-    'accept-version' => D_ACCEPT_VERSION,
+    'accept-version' => '1.0,1.1,1.2',
     'heart-beat'     => join( ',', $cx, $cy ),
   );
   if ( defined $self->{login} ) {
@@ -554,7 +554,8 @@ sub _login {
           }
         }
 
-        $self->{_ready} = 1;
+        $self->{_ready}      = 1;
+        $self->{_session_id} = $headers->{session};
         $self->_process_input_queue;
       },
     }
@@ -726,6 +727,7 @@ sub _reset_internals {
   $self->{_connected}       = 0;
   $self->{_login_state}     = S_NEED_DO;
   $self->{_ready}           = 0;
+  $self->{_session_id}      = undef;
   $self->{_reconnect_timer} = undef;
   $self->{_receipt_seq}     = 1;
 
