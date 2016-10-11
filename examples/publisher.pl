@@ -30,12 +30,14 @@ my $num = 1;
 my $timer;
 $timer = AE::timer( 0, 1,
   sub {
+    my $body = 'foo' . $num++;
+
     $stomper->send(
       destination   => '/queue/foo',
       persistent    => 'true',
       durable       => 'true',
       'auto-delete' => 'false',
-      body          => 'foo' . $num++,
+      body          => $body,
 
       sub {
         my $receipt = shift;
@@ -46,7 +48,7 @@ $timer = AE::timer( 0, 1,
           return;
         }
 
-        print Dumper($receipt);
+        print "Published: $body\n";
       }
     );
   },

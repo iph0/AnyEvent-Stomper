@@ -5,8 +5,6 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-# TODO heart-beat
-
 our $VERSION = '0.01_01';
 
 use AnyEvent::Stomper::Frame;
@@ -70,9 +68,21 @@ sub new {
   $self->{passcode} = $params{passcode};
   $self->{vhost}    = $params{vhost};
 
-  # TODO vld heart_beat
-  $self->{heart_beat}
-      = defined $params{heart_beat} ? $params{heart_beat} : D_HEART_BEAT;
+  if ( defined $params{heart_beat} ) {
+    unless ( ref( $params{heart_beat} ) eq 'ARRAY' ) {
+      croak qq{"heart_beat" must be specified as array reference};
+    }
+    foreach my $val ( @{ $params{heart_beat} } ) {
+      if ( $val =~ /\D/ ) {
+        croak qq{"heart_beat" values must be an integer numbers};
+      }
+    }
+
+    $self->{heart_beat} = $params{heart_beat};
+  }
+  else {
+    $self->{heart_beat} = D_HEART_BEAT;
+  }
 
   $self->{lazy}          = $params{lazy};
   $self->{handle_params} = $params{handle_params} || {};
@@ -314,17 +324,17 @@ sub _create_on_read {
       return if $handle->destroyed;
 
       if ( defined $cmd_name ) {
-        my $content_len = $headers->{'content-length'};
+        my $content_length = $headers->{'content-length'};
 
-        if ( defined $content_len ) {
-          return if length( $handle->{rbuf} ) < $content_len + 1;
+        if ( defined $content_length ) {
+          return if length( $handle->{rbuf} ) < $content_length + 1;
         }
         else {
-          $content_len = index( $handle->{rbuf}, "\0" );
-          return if $content_len < 0
+          $content_length = index( $handle->{rbuf}, "\0" );
+          return if $content_length < 0
         }
 
-        my $body = substr( $handle->{rbuf}, 0, $content_len, '' );
+        my $body = substr( $handle->{rbuf}, 0, $content_length, '' );
         $handle->{rbuf} =~ s/^\0(?:${\(RE_EOL)})*//;
 
         $frame = _new_frame( $cmd_name, $headers, $body );
@@ -337,8 +347,11 @@ sub _create_on_read {
 
         return unless $handle->{rbuf} =~ s/^(.+?)(?:${\(RE_EOL)}){2}//s;
 
-        ( $cmd_name, my @header_tokens ) = split( m/(?::|${\(RE_EOL)})/, $1 );
-        $headers = { map { _unescape($_) } @header_tokens };
+        ( $cmd_name, my @header_strings ) = split( m/${\(RE_EOL)}/, $1 );
+        foreach my $header_str (@header_strings) {
+          my ( $name, $value ) = split( /:/, $header_str, 2 );
+          $headers->{ _unescape($name) } = _unescape($value);
+        }
 
         next;
       }
@@ -473,11 +486,10 @@ sub _push_write {
   unless ( defined $headers->{'content-length'} ) {
     $headers->{'content-length'} = length( $cmd->{body} );
   }
+
   my $frame_str = uc( $cmd->{name} ) . EOL;
   while ( my ( $name, $value ) = each %{$headers} ) {
-    $name  = _escape($name);
-    $value = _escape($value);
-    $frame_str .= $name . ':' . $value . EOL;
+    $frame_str .= _escape($name) . ':' . _escape($value) . EOL;
   }
   $frame_str .= EOL . $cmd->{body} . "\0";
 
@@ -489,12 +501,10 @@ sub _push_write {
 sub _login {
   my $self = shift;
 
-  my $handle      = $self->{_handle};
   my ( $cx, $cy ) = @{ $self->{heart_beat} };
 
   if ( $cy > 0 ) {
-    $handle->rtimeout_reset;
-    $handle->rtimeout( ( $cy / 1000 ) * 3 );
+    $self->_rtimeout($cy);
   }
 
   my %headers = (
@@ -529,30 +539,46 @@ sub _login {
           return;
         }
 
+        $self->{_login_state} = S_DONE;
+
         my $headers = $receipt->headers;
 
         if ( defined $headers->{'heart-beat'} ) {
-          my $handle      = $self->{_handle};
           my ( $sx, $sy ) = split( /,/, $headers->{'heart-beat'} );
 
           if ( $sx > 0 ) {
-            $handle->rtimeout_reset;
-            $handle->rtimeout( ( max( $cy, $sx ) / 1000 ) * 3 );
+            $self->_rtimeout( max( $cy, $sx ) );
           }
-
           if ( $sy > 0 ) {
-            $handle->wtimeout_reset;
-            $handle->wtimeout( max( $cx, $sy ) / 1000 );
+            $self->_wtimeout( max( $cx, $sy ) );
           }
         }
-
-        $self->{_login_state} = S_DONE;
 
         $self->{_ready} = 1;
         $self->_process_input_queue;
       },
     }
   );
+
+  return;
+}
+
+sub _rtimeout {
+  my $self     = shift;
+  my $rtimeout = shift;
+
+  $self->{_handle}->rtimeout_reset;
+  $self->{_handle}->rtimeout( ( $rtimeout / 1000 ) * 3 );
+
+  return;
+}
+
+sub _wtimeout {
+  my $self     = shift;
+  my $wtimeout = shift;
+
+  $self->{_handle}->wtimeout_reset;
+  $self->{_handle}->wtimeout( $wtimeout / 1000 );
 
   return;
 }
