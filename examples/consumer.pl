@@ -31,7 +31,7 @@ my $dst    = '/queue/foo';
 $stomper->subscribe(
   id          => $sub_id,
   destination => $dst,
-  ack         => 'client',
+  ack         => 'client-individual',
 
   { on_receipt => sub {
       my $receipt = shift;
@@ -53,8 +53,11 @@ $stomper->subscribe(
       my $headers = $msg->headers;
       my $body    = $msg->body;
 
+      print "Consumed: $body\n";
+
       $stomper->ack(
-        id => $headers->{ack},
+        id      => $headers->{ack},
+        receipt => 'auto',
 
         sub {
           my $receipt = shift;
@@ -65,7 +68,7 @@ $stomper->subscribe(
             return;
           }
 
-          print "Consumed: $body\n";
+          print "Acked: $headers->{ack}\n";
         }
       );
     },

@@ -46,6 +46,11 @@ my %SUBUNSUB_CMDS = (
   UNSUBSCRIBE => 1,
 );
 
+my %NEED_RECEIPT = (
+  CONNECT => 1,
+  %SUBUNSUB_CMDS,
+);
+
 my %ESCAPE_MAP = (
   "\r" => "\\r",
   "\n" => "\\n",
@@ -390,10 +395,7 @@ sub _prepare {
     %{$cbs},
   };
 
-  if ( defined $cmd->{on_receipt} ) {
-    $cmd->{need_receipt} = 1;
-  }
-  else {
+  unless ( defined $cmd->{on_receipt} ) {
     weaken($self);
 
     $cmd->{on_receipt} = sub {
@@ -467,17 +469,23 @@ sub _push_write {
 
   my $headers = $cmd->{headers};
 
-  if ( exists $SUBUNSUB_CMDS{ $cmd->{name} }
-    || defined $cmd->{need_receipt} )
+  my $need_receipt;
+  if ( exists $NEED_RECEIPT{ $cmd->{name} }
+    || defined $headers->{receipt} )
   {
-    unless ( defined $headers->{receipt} ) {
-      $headers->{receipt} = $self->{_session_id} . '@@'
-          . $self->{_receipt_seq}++;
+    $need_receipt = 1;
+    if ( $cmd->{name} eq 'CONNECT' ) {
+      $self->{_pending_receipts}{CONNECTED} = $cmd;
     }
-    $self->{_pending_receipts}{ $headers->{receipt} } = $cmd;
-  }
-  elsif ( $cmd->{name} eq 'CONNECT' ) {
-    $self->{_pending_receipts}{CONNECTED} = $cmd;
+    else {
+      if ( !defined $headers->{receipt}
+        || $headers->{receipt} eq 'auto' )
+      {
+        $headers->{receipt} = $self->{_session_id} . '@@'
+            . $self->{_receipt_seq}++;
+      }
+      $self->{_pending_receipts}{ $headers->{receipt} } = $cmd;
+    }
   }
 
   unless ( defined $cmd->{body} ) {
@@ -494,6 +502,10 @@ sub _push_write {
   $frame_str .= EOL . $cmd->{body} . "\0";
 
   $self->{_handle}->push_write($frame_str);
+
+  unless ($need_receipt) {
+    AE::postpone { $cmd->{on_receipt}->() };
+  }
 
   return;
 }
