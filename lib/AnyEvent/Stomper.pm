@@ -1126,7 +1126,7 @@ Sends a message to a destination in the messaging system.
     }
   );
 
-=head2 subscribe( [ %headers ] [, ( $cb->( $msg ) | \%cbs ) ] )
+=head2 subscribe( [ %headers, ] ( $cb->( $msg ) | \%cbs ) )
 
 The method is used to register to listen to a given destination. The
 C<subscribe> method require the C<on_message> callback, which is called on
