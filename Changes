@@ -1,6 +1,4 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
-0.01  Wed Oct  5 17:37:42 2016
-	- original version; created by h2xs 1.23 with options
-		-AXO --skip-exporter -b 5.8.0 -n AnyEvent::Stomper
-
+0.02 Tue Nov 15 12:33:20 MSK 2016
+	- Initial release.
