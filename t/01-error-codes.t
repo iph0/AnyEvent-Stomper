@@ -2,7 +2,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-use Test::More tests => 8;
+use Test::More tests => 7;
 use AnyEvent::Stomper qw( :err_codes );
 
 is( E_CANT_CONN, 1, 'E_CANT_CONN' );
