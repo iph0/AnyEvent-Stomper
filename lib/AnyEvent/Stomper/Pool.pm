@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.05_01';
+our $VERSION = '0.06';
 
 use AnyEvent::Stomper;
 use Scalar::Util qw( weaken );
