@@ -1048,30 +1048,32 @@ an error messages to C<STDERR>.
 
 =head1 COMMAND METHODS
 
-In every command method you can specify C<body> parameter, in which you can
-specify body of the command frame.
+To execute the STOMP command you must call appropriate method. The client
+automaticaly adds C<content-length> header to all outgoing frames. The body of
+the frame you can specify in C<body> parameter of the command method.
 
-Command callback is called after successful writing of the command to the
-socket or, when RECEIPT frame will be received.
-
-If you want to receive RECEIPT frame you must specify C<receipt> header.
-The C<receipt> header can take special value C<auto>. In this case the RECEIPT
-identificator will be generated automaticaly by the client. RECEIPT frame is
-passed to the callback in first argument. If the C<receipt> header is not
-specified the first argument of the callback will be C<undef>.
+If you want to receive C<RECEIPT> frame, you must specify C<receipt> header.
+The C<receipt> header can take special value C<auto>. In this case the
+value for C<receipt> header will be generated automaticaly by the client.
+C<RECEIPT> frame is passed to the command callback in first argument as the
+object of the class L<AnyEvent::Stomper::Frame>. If the C<receipt> header
+is not specified the first argument of the command callback will be C<undef>.
 
 For commands C<SUBSCRIBE>, C<UNSUBSCRIBE>, C<DISCONNECT> the client
-automaticaly add C<receipt> header.
+automaticaly adds C<receipt> header for internal usage.
 
-If any error occurred during the command execution, the error object is passed
-to the callback in second argument. Error object is an instance of the class
-L<AnyEvent::Stomper::Error>.
+The command callback is called after successful sending of the command to the
+server or when C<RECEIPT> frame will be received, in case if C<receipt> header
+is specified. If any error occurred during the command execution, the error
+object is passed to the callback in second argument. Error object is the
+instance of the class L<AnyEvent::Stomper::Error>.
 
 The command callback is optional. If it is not specified and any error
 occurred, the C<on_error> callback of the client is called.
 
-Available headers for every command you can find in STOMP protocol
-specification. For various versions they can be differ.
+The full list of all available headers for every command you can find in STOMP
+protocol specification and in documentation on your queue broker. For various
+versions of STOMP protocol and various queue brokers they can be differ.
 
 =head2 send( [ %headers ] [, $cb->( $receipt, $err ) ] )
 
@@ -1126,7 +1128,11 @@ Sends a message to a destination in the messaging system.
 
 =head2 subscribe( [ %headers ] [, ( $cb->( $receipt, $err ) | \%cbs ) ] )
 
-The method is used to register to listen to a given destination.
+The method is used to register to listen to a given destination. The
+C<subscribe> method require the C<on_message> callback, which is called when
+C<MESSAGE> frame from the server was received. The C<MESSAGE> frame is passed
+to the C<on_message> callback in first argument as the object of the class
+L<AnyEvent::Stomper::Frame>.
 
   $stomper->subscribe(
     id          => 'foo',
@@ -1257,7 +1263,7 @@ A client can disconnect from the server at anytime by closing the socket but
 there is no guarantee that the previously sent frames have been received by
 the server. To do a graceful shutdown, where the client is assured that all
 previous frames have been received by the server, you must call C<disconnect>
-method and wait for the RECEIPT frame.
+method and wait for the C<RECEIPT> frame.
 
 =head2 execute( $command, [ %headers ] [, $cb->( $receipt, $err ) ] )
 
@@ -1288,6 +1294,12 @@ convenient.
   );
 
 =head1 ERROR CODES
+
+Every error object, passed to callback, contain error code, which can be used
+for programmatic handling of errors. AnyEvent::Stomper provides constants for
+error codes. They can be imported and used in expressions.
+
+  use AnyEvent::Stomper qw( :err_codes );
 
 =over
 

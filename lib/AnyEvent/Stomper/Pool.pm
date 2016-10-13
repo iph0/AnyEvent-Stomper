@@ -176,7 +176,7 @@ sub _reset_internals {
 
   $self->{_nodes_idx}  = {};
   $self->{_nodes_list} = [];
-  $self->{_pool_size}  = undef;
+  $self->{_pool_size}  = 0;
   $self->{_node_index} = 0;
 
   return;
@@ -389,7 +389,7 @@ Gets specified node.
 
 =head2 nodes()
 
-Returns all available nodes.
+Gets all available nodes.
 
 =head2 random()
 
@@ -397,7 +397,7 @@ Gets random node.
 
 =head2 next()
 
-Gets next available node cyclically.
+Gets next node from nodes list cyclically.
 
 =head2 force_disconnect()
 
