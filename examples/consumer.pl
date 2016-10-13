@@ -54,9 +54,8 @@ $stomper->subscribe(
       print "Consumed: $body\n";
 
       $stomper->ack(
-        id           => $headers->{ack},
-        subscription => $sub_id,
-        receipt      => 'auto',
+        id      => $headers->{ack},
+        receipt => 'auto',
 
         sub {
           my $receipt = shift;

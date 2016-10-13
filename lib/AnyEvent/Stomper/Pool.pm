@@ -295,13 +295,11 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
 =item handle_params => \%params
 
-=item on_connect => $on_connect
+=item on_connect => $cb->()
 
-=item on_disconnect => $on_disconnect
+=item on_disconnect => $cb->()
 
-=item on_connect => $on_connect
-
-=item on_error => $on_error
+=item on_error => $cb->( $err )
 
 =back
 
