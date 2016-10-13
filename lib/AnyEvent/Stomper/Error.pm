@@ -81,10 +81,15 @@ Gets error frame
 
 L<AnyEvent::Stomper>
 
+=head1 AUTHOR
+
+Eugene Ponizovsky, E<lt>ponizovsky@gmail.comE<gt>
+
+Sponsored by SMS Online, E<lt>dev.opensource@sms-online.comE<gt>
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2016, Eugene Ponizovsky, E<lt>ponizovsky@gmail.comE<gt>.
-All rights reserved.
+Copyright (c) 2016, Eugene Ponizovsky, SMS Online. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
