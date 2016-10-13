@@ -415,7 +415,7 @@ sub _prepare {
         $self->{on_error}->( $err, $receipt );
         return;
       }
-    }
+    };
   }
 
   return $cmd;

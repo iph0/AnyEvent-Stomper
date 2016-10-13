@@ -313,9 +313,6 @@ Not set by default.
 =item connection_timeout => $connection_timeout
 
 Specifies connection timeout. If the client could not connect to the node
-If enabled, the connection establishes at time when you will send the first
-command to the server. By default the connection establishes after calling of
-the C<new> method.
 after specified timeout, the C<on_node_error> callback is called with the
 C<E_CANT_CONN> error. The timeout specifies in seconds and can contain a
 fractional part.
