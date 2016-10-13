@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05_01';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -1049,18 +1049,18 @@ an error messages to C<STDERR>.
 =head1 COMMAND METHODS
 
 To execute the STOMP command you must call appropriate method. The client
-automaticaly adds C<content-length> header to all outgoing frames. The body of
+automatically adds C<content-length> header to all outgoing frames. The body of
 the frame you can specify in C<body> parameter of the command method.
 
 If you want to receive C<RECEIPT> frame, you must specify C<receipt> header.
 The C<receipt> header can take special value C<auto>. In this case the
-value for C<receipt> header will be generated automaticaly by the client.
+value for C<receipt> header will be generated automatically by the client.
 C<RECEIPT> frame is passed to the command callback in first argument as the
 object of the class L<AnyEvent::Stomper::Frame>. If the C<receipt> header
 is not specified the first argument of the command callback will be C<undef>.
 
 For commands C<SUBSCRIBE>, C<UNSUBSCRIBE>, C<DISCONNECT> the client
-automaticaly adds C<receipt> header for internal usage.
+automatically adds C<receipt> header for internal usage.
 
 The command callback is called after successful sending of the command to the
 server or when C<RECEIPT> frame will be received, in case if C<receipt> header
