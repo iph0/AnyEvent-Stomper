@@ -911,8 +911,8 @@ AnyEvent::Stomper - Flexible non-blocking STOMP client
 
 =head1 DESCRIPTION
 
-AnyEvent::Stomper is flexible non-blocking STOMP client. Supports STOMP 1.0,
-1.1, 1.2.
+AnyEvent::Stomper is flexible non-blocking STOMP client. Supports following
+STOMP versions: 1.0, 1.1, 1.2.
 
 Is recommended to read STOMP protocol specification before using the client:
 L<https://stomp.github.io/index.html>
@@ -1008,6 +1008,8 @@ this interval. Commands executed between reconnections will be queued.
 
   reconnect_interval => 5,
 
+Not set by default.
+
 =item handle_params => \%params
 
 Specifies L<AnyEvent::Handle> parameters.
@@ -1046,11 +1048,11 @@ an error messages to C<STDERR>.
 
 =head1 COMMAND METHODS
 
-In every command method you can specify special pseudo-header C<body>, in which
-can be specified body of the command frame.
+In every command method you can specify C<body> parameter, in which you can
+specify body of the command frame.
 
-Command callback is called after a successful writing of the command to the
-socket or when RECEIPT frame will be received.
+Command callback is called after successful writing of the command to the
+socket or, when RECEIPT frame will be received.
 
 If you want to receive RECEIPT frame you must specify C<receipt> header.
 The C<receipt> header can take special value C<auto>. In this case the RECEIPT
@@ -1067,6 +1069,9 @@ L<AnyEvent::Stomper::Error>.
 
 The command callback is optional. If it is not specified and any error
 occurred, the C<on_error> callback of the client is called.
+
+Available headers for every command you can find in STOMP protocol
+specification. For various versions they can be differ.
 
 =head2 send( [ %headers ] [, $cb->( $receipt, $err ) ] )
 
@@ -1126,6 +1131,7 @@ The method is used to register to listen to a given destination.
   $stomper->subscribe(
     id          => 'foo',
     destination => '/queue/foo',
+    ack         => 'client',
 
     { on_receipt => sub {
         my $receipt = shift;
@@ -1155,7 +1161,7 @@ The method is used to register to listen to a given destination.
 
 =head2 unsubscribe( [ %headers ] [, $cb->( $receipt, $err ) ] )
 
-The method is used to remove an existing subscription
+The method is used to remove an existing subscription.
 
   $stomper->unsubscribe(
     id          => 'foo',
@@ -1239,11 +1245,11 @@ The method C<begin> is used to start a transaction.
 
 =head2 commit( [ %headers ] [, $cb->( $receipt, $err ) ] )
 
-The method C<commit> is used to commit a transaction in progress.
+The method C<commit> is used to commit a transaction.
 
 =head2 abort( [ %headers ] [, $cb->( $receipt, $err ) ] )
 
-The method C<abort> is used to roll back a transaction in progress.
+The method C<abort> is used to roll back a transaction.
 
 =head2 disconnect( [ %headers ] [, $cb->( $receipt, $err ) ] )
 

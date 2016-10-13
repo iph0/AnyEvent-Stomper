@@ -196,9 +196,9 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
   my $pool = AnyEvent::Stomper::Pool->new(
     nodes => [
-      { host => '172.18.0.2', port => 61613 },
-      { host => '172.18.0.3', port => 61613 },
-      { host => '172.18.0.4', port => 61613 },
+      { host => 'mq-broker-1.com', port => 61613 },
+      { host => 'mq-broker-2.com', port => 61613 },
+      { host => 'mq-broker-3.com', port => 61613 },
     ],
     login    => 'guest',
     passcode => 'guest',
@@ -242,15 +242,18 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
 =head1 DESCRIPTION
 
+AnyEvent::Stomper::Pool is connection pool for AnyEvent::Stomper. This module
+can be used to work with cluster of queue brokers.
+
 =head1 CONSTRUCTOR
 
 =head2 new( %params )
 
   my $stomper = AnyEvent::Stomper::Pool->new(
     nodes => [
-      { host => '172.18.0.2', port => 61613 },
-      { host => '172.18.0.3', port => 61613 },
-      { host => '172.18.0.4', port => 61613 },
+      { host => 'mq-broker-1.com', port => 61613 },
+      { host => 'mq-broker-2.com', port => 61613 },
+      { host => 'mq-broker-3.com', port => 61613 },
     ],
     login              => 'guest',
     passcode           => 'guest',
@@ -279,27 +282,102 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
 =item nodes => \@nodes
 
+Specifies the list of nodes. Parameter should contain array of hashes. Each
+hash should contain C<host> and C<port> elements.
+
 =item login => $login
+
+The user identifier used to authenticate against a secured STOMP server.
 
 =item passcode => $passcode
 
+The password used to authenticate against a secured STOMP server.
+
 =item vhost => $vhost
+
+The name of a virtual host that the client wishes to connect to.
 
 =item heart_beat => \@heart_beat
 
+Heart-beating can optionally be used to test the healthiness of the underlying
+TCP connection and to make sure that the remote end is alive and kicking. The
+first number sets interval in milliseconds between outgoing heart-beats to the
+STOMP server. C<0> means, that the client will not send heart-beats. The second
+number sets interval in milliseconds between incoming heart-beats from the
+STOMP server. C<0> means, that the client does not want to receive heart-beats.
+
+  heart_beat => [ 5000, 5000 ],
+
+Not set by default.
+
 =item connection_timeout => $connection_timeout
+
+Specifies connection timeout. If the client could not connect to the node
+If enabled, the connection establishes at time when you will send the first
+command to the server. By default the connection establishes after calling of
+the C<new> method.
+after specified timeout, the C<on_node_error> callback is called with the
+C<E_CANT_CONN> error. The timeout specifies in seconds and can contain a
+fractional part.
+
+  connection_timeout => 10.5,
+
+By default the client use kernel's connection timeout.
 
 =item lazy => $boolean
 
+If enabled, the connection establishes at time when you will send the first
+command to the node. By default the connection establishes after calling of
+the C<new> method.
+
+Disabled by default.
+
 =item reconnect_interval => $reconnect_interval
+
+If the parameter is specified, the client will try to reconnect only after
+this interval. Commands executed between reconnections will be queued.
+
+  reconnect_interval => 5,
+
+Not set by default.
 
 =item handle_params => \%params
 
-=item on_connect => $cb->()
+Specifies L<AnyEvent::Handle> parameters.
 
-=item on_disconnect => $cb->()
+  handle_params => {
+    autocork => 1,
+    linger   => 60,
+  }
 
-=item on_error => $cb->( $err )
+Enabling of the C<autocork> parameter can improve perfomance. See
+documentation on L<AnyEvent::Handle> for more information.
+
+=item on_node_connect => $cb->( $host, $port )
+
+The C<on_node_connect> callback is called when the connection to specific node
+is successfully established. To callback are passed two arguments: host and
+port of the node to which the client was connected.
+
+Not set by default.
+
+=item on_node_disconnect => $cb->( $host, $port )
+
+The C<on_node_disconnect> callback is called when the connection to specific
+node is closed by any reason. To callback are passed two arguments: host and
+port of the node from which the client was disconnected.
+
+Not set by default.
+
+=item on_node_error => $cb->( $err, $host, $port )
+
+The C<on_node_error> callback is called when occurred an error, which was
+affected on entire node (e. g. connection error or authentication error). Also
+the C<on_node_error> callback can be called on command errors if the command
+callback is not specified. To callback are passed three arguments: error object,
+and host and port of the node on which an error occurred.
+
+Not set by default.
 
 =back
 
@@ -307,13 +385,24 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
 =head2 get( $host, $port )
 
+Gets specified node.
+
 =head2 nodes()
+
+Returns all available nodes.
 
 =head2 random()
 
+Gets random node.
+
 =head2 next()
 
+Gets next available node cyclically.
+
 =head2 force_disconnect()
+
+The method for forced disconnection. All uncompleted operations will be
+aborted.
 
 =head1 SEE ALSO
 
