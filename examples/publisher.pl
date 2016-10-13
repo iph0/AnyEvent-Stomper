@@ -1,13 +1,14 @@
-#1/usr/bin/env perl
+#/usr/bin/env perl
 
 use strict;
 use warnings;
 
-use AnyEvent::Stomper qw( :err_codes );
+use AnyEvent;
+use AnyEvent::Stomper;
 
 my $stomper = AnyEvent::Stomper->new(
   host       => 'localhost',
-  prot       => '61613',
+  port       => '61613',
   login      => 'guest',
   passcode   => 'guest',
   heart_beat => [ 5000, 5000 ],

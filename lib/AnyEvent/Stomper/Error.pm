@@ -68,11 +68,15 @@ Creates error object.
 
 =head2 message()
 
-Get error message.
+Gets error message.
 
 =head2 code()
 
-Get error code.
+Gets error code.
+
+=head2 frame()
+
+Gets error frame
 
 =head1 SEE ALSO
 

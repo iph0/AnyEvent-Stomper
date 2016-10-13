@@ -60,24 +60,46 @@ AnyEvent::Stomper::Frame - Class of STOMP frame for AnyEvent::Stomper
 
 =head1 DESCRIPTION
 
+Class of frame for L<AnyEvent::Stomper>. Objects of this class can be passed
+to callbacks.
+
 =head1 CONSTRUCTOR
+
+=head2 new( $command, \%headers, $body )
+
+Creates error object.
 
 =head1 METHODS
 
 =head2 command( [ $command ] )
 
+Gets command name
+
 =head2 headers( [ $headers ] )
 
+Gets frame headers
+
 =head2 body( [ $body ] )
+
+Gets frame body
+
+=head2 decoded_body()
+
+Gest decoded frame body
 
 =head1 SEE ALSO
 
 L<AnyEvent::Stomper>
 
+=head1 AUTHOR
+
+Eugene Ponizovsky, E<lt>ponizovsky@gmail.comE<gt>
+
+Sponsored by SMS Online, E<lt>dev.opensource@sms-online.comE<gt>
+
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2016, Eugene Ponizovsky, E<lt>ponizovsky@gmail.comE<gt>.
-All rights reserved.
+Copyright (c) 2016, Eugene Ponizovsky, SMS Online. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

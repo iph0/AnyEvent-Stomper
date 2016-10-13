@@ -864,39 +864,170 @@ AnyEvent::Stomper - Flexible non-blocking STOMP client
 
 =head1 SYNOPSIS
 
+  use AnyEvent;
   use AnyEvent::Stomper;
-  blah blah blah
+
+  my $stomper = AnyEvent::Stomper->new(
+    host       => 'localhost',
+    prot       => '61613',
+    login      => 'guest',
+    passcode   => 'guest',
+  );
+
+  my $cv = AE::cv;
+
+  $stomper->subscribe(
+    id          => 'foo',
+    destination => '/queue/foo',
+
+    { on_receipt => sub {
+        my $err = $_[1];
+
+        if ( defined $err ) {
+          warn $err->message . "\n";
+          $cv->send;
+
+          return;
+        }
+
+        $stomper->send(
+          destination => '/queue/foo',
+          body        => 'Hello, world!',
+        );
+      },
+
+      on_message => sub {
+        my $msg = shift;
+
+        my $body = $msg->body;
+        print "Consumed: $body\n";
+
+        $cv->send;
+      },
+    }
+  );
+
+  $cv->recv;
 
 =head1 DESCRIPTION
 
-Stub documentation for AnyEvent::Stomper, created by h2xs. It looks like the
-author of the extension was negligent enough to leave the stub
-unedited.
+=head1 CONSTRUCTOR
 
-Blah blah blah.
+=head2 new( %params )
 
+  my $stomper = AnyEvent::Stomper->new(
+    host               => 'localhost',
+    port               => '61613',
+    login              => 'guest',
+    passcode           => 'guest',
+    vhost              => '/',
+    heart_beat         => [ 5000, 5000 ],
+    connection_timeout => 5,
+    lazy               => 1,
+    reconnect_interval => 5,
+
+    on_connect => sub {
+      # handling...
+    },
+
+    on_disconnect => sub {
+      # handling...
+    },
+
+    on_error => sub {
+      my $err = shift;
+
+      # error handling...
+    },
+  );
+
+=over
+
+=item host => $host
+
+=item port => $port
+
+=item login => $login
+
+=item passcode => $passcode
+
+=item vhost => $vhost
+
+=item heart_beat => \@heart_beat
+
+=item connection_timeout => $connection_timeout
+
+=item lazy => $boolean
+
+=item reconnect_interval => $reconnect_interval
+
+=item handle_params => \%params
+
+=item on_connect => $on_connect
+
+=item on_disconnect => $on_disconnect
+
+=item on_connect => $on_connect
+
+=item on_error => $on_error
+
+=back
+
+=head1 COMMAND METHODS
+
+=head2 send( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 subscribe( [ %headers ] [, ( $cb->( $receipt, $err ) | \%cbs ) ] )
+
+=head2 unsubscribe( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 ack( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 nack( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 begin( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 commit( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 abort( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 disconnect( [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head2 execute( $command, [ %headers ] [, $cb->( $receipt, $err ) ] )
+
+=head1 OTHER METHODS
+
+=head2 host()
+
+=head2 port()
+
+=head2 connection_timeout( [ $fractional_seconds ] )
+
+=head2 reconnect_interval( [ $fractional_seconds ] )
+
+=head2 on_connect( [ $callback ] )
+
+=head2 on_disconnect( [ $callback ] )
+
+=head2 on_error( [ $callback ] )
+
+=head2 force_disconnect()
 
 =head1 SEE ALSO
 
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
+L<AnyEvent::Stomper::Pool>
 
 =head1 AUTHOR
 
-Eugene Ponizovsky, E<lt>iph@E<gt>
+Eugene Ponizovsky, E<lt>ponizovsky@gmail.comE<gt>
+
+Sponsored by SMS Online, E<lt>dev.opensource@sms-online.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2016 by Eugene Ponizovsky
+Copyright (c) 2016, Eugene Ponizovsky, SMS Online. All rights reserved.
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.14.2 or,
-at your option, any later version of Perl 5 you may have available.
+This module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
 
 =cut
