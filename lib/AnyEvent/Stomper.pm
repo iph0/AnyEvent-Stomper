@@ -121,6 +121,14 @@ sub execute {
   return;
 }
 
+sub force_disconnect {
+  my $self = shift;
+
+  $self->_disconnect();
+
+  return;
+}
+
 # Generate methods
 {
   no strict qw( refs );
@@ -386,12 +394,12 @@ sub _prepare {
       }
     }
   }
-  my %headers = @{$args};
-  my $body    = delete $headers{body};
+  my %cmd_headers = @{$args};
+  my $body        = delete $cmd_headers{body};
 
   my $cmd = {
     name    => $cmd_name,
-    headers => \%headers,
+    headers => \%cmd_headers,
     body    => $body,
     %{$cbs},
   };
@@ -468,36 +476,36 @@ sub _push_write {
   my $self = shift;
   my $cmd  = shift;
 
-  my $headers = $cmd->{headers};
+  my $cmd_headers = $cmd->{headers};
 
   my $need_receipt;
   if ( exists $NEED_RECEIPT{ $cmd->{name} }
-    || defined $headers->{receipt} )
+    || defined $cmd_headers->{receipt} )
   {
     $need_receipt = 1;
     if ( $cmd->{name} eq 'CONNECT' ) {
       $self->{_pending_receipts}{CONNECTED} = $cmd;
     }
     else {
-      if ( !defined $headers->{receipt}
-        || $headers->{receipt} eq 'auto' )
+      if ( !defined $cmd_headers->{receipt}
+        || $cmd_headers->{receipt} eq 'auto' )
       {
-        $headers->{receipt} = $self->{_session_id} . '@@'
+        $cmd_headers->{receipt} = $self->{_session_id} . '@@'
             . $self->{_receipt_seq}++;
       }
-      $self->{_pending_receipts}{ $headers->{receipt} } = $cmd;
+      $self->{_pending_receipts}{ $cmd_headers->{receipt} } = $cmd;
     }
   }
 
   unless ( defined $cmd->{body} ) {
     $cmd->{body} = '';
   }
-  unless ( defined $headers->{'content-length'} ) {
-    $headers->{'content-length'} = length( $cmd->{body} );
+  unless ( defined $cmd_headers->{'content-length'} ) {
+    $cmd_headers->{'content-length'} = length( $cmd->{body} );
   }
 
   my $frame_str = uc( $cmd->{name} ) . EOL;
-  while ( my ( $name, $value ) = each %{$headers} ) {
+  while ( my ( $name, $value ) = each %{$cmd_headers} ) {
     $frame_str .= _escape($name) . ':' . _escape($value) . EOL;
   }
   $frame_str .= EOL . $cmd->{body} . "\0";
@@ -520,18 +528,18 @@ sub _login {
     $self->_rtimeout($cy);
   }
 
-  my %headers = (
+  my %cmd_headers = (
     'accept-version' => '1.0,1.1,1.2',
     'heart-beat'     => join( ',', $cx, $cy ),
   );
   if ( defined $self->{login} ) {
-    $headers{login} = $self->{login};
+    $cmd_headers{login} = $self->{login};
   }
   if ( defined $self->{passcode} ) {
-    $headers{passcode} = $self->{passcode};
+    $cmd_headers{passcode} = $self->{passcode};
   }
   if ( defined $self->{vhost} ) {
-    $headers{host} = $self->{vhost};
+    $cmd_headers{host} = $self->{vhost};
   }
 
   weaken($self);
@@ -539,7 +547,7 @@ sub _login {
 
   $self->_push_write(
     { name    => 'CONNECT',
-      headers => \%headers,
+      headers => \%cmd_headers,
 
       on_receipt => sub {
         my $receipt = shift;
@@ -554,10 +562,10 @@ sub _login {
 
         $self->{_login_state} = S_DONE;
 
-        my $headers = $receipt->headers;
+        my $receipt_headers = $receipt->headers;
 
-        if ( defined $headers->{'heart-beat'} ) {
-          my ( $sx, $sy ) = split( /,/, $headers->{'heart-beat'} );
+        if ( defined $receipt_headers->{'heart-beat'} ) {
+          my ( $sx, $sy ) = split( /,/, $receipt_headers->{'heart-beat'} );
 
           if ( $sx > 0 ) {
             $self->_rtimeout( max( $cy, $sx ) );
@@ -568,7 +576,7 @@ sub _login {
         }
 
         $self->{_ready}      = 1;
-        $self->{_session_id} = $headers->{session};
+        $self->{_session_id} = $receipt_headers->{session};
 
         $self->_process_input_queue;
       },
@@ -637,11 +645,11 @@ sub _process_frame {
 
 sub _process_message {
   my $self = shift;
-  my $frame = shift;
+  my $msg  = shift;
 
-  my $headers = $frame->headers;
-  my $sub_id  = $headers->{subscription} || $headers->{destination};
-  my $cmd     = $self->{_subs}{$sub_id};
+  my $msg_headers = $msg->headers;
+  my $sub_id = $msg_headers->{subscription} || $msg_headers->{destination};
+  my $cmd    = $self->{_subs}{$sub_id};
 
   unless ( defined $cmd ) {
     my $err = _new_error(
@@ -653,16 +661,16 @@ sub _process_message {
     return;
   }
 
-  $cmd->{on_message}->($frame);
+  $cmd->{on_message}->($msg);
 
   return;
 }
 
 sub _process_receipt {
-  my $self  = shift;
-  my $frame = shift;
+  my $self    = shift;
+  my $receipt = shift;
 
-  my $receipt_id = $frame->headers->{'receipt-id'};
+  my $receipt_id = $receipt->headers->{'receipt-id'};
   my $cmd        = delete $self->{_pending_receipts}{$receipt_id};
 
   unless ( defined $cmd ) {
@@ -676,8 +684,8 @@ sub _process_receipt {
   }
 
   if ( exists $SUBUNSUB_CMDS{ $cmd->{name} } ) {
-    my $headers = $cmd->{headers};
-    my $sub_id  = $headers->{id} || $headers->{destination};
+    my $cmd_headers = $cmd->{headers};
+    my $sub_id = $cmd_headers->{id} || $cmd_headers->{destination};
 
     if ( $cmd->{name} eq 'SUBSCRIBE' ) {
       $self->{_subs}{$sub_id} = $cmd;
@@ -690,21 +698,21 @@ sub _process_receipt {
     $self->_disconnect;
   }
 
-  $cmd->{on_receipt}->($frame);
+  $cmd->{on_receipt}->($receipt);
 
   return;
 }
 
 sub _process_error {
-  my $self  = shift;
-  my $frame = shift;
+  my $self      = shift;
+  my $err_frame = shift;
 
-  my $headers = $frame->headers;
-  my $err     = _new_error( $headers->{message}, E_OPRN_ERROR, $frame );
+  my $err_headers = $err_frame->headers;
+  my $err = _new_error( $err_headers->{message}, E_OPRN_ERROR, $err_frame );
 
   my $cmd;
-  if ( defined $headers->{'receipt-id'} ) {
-    $cmd = delete $self->{_pending_receipts}{ $headers->{'receipt-id'} };
+  if ( defined $err_headers->{'receipt-id'} ) {
+    $cmd = delete $self->{_pending_receipts}{ $err_headers->{'receipt-id'} };
   }
 
   if ( defined $cmd ) {

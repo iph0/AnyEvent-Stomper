@@ -1,6 +1,5 @@
 #1/usr/bin/env perl
 
-use 5.010000;
 use strict;
 use warnings;
 
@@ -22,8 +21,7 @@ my $stomper = AnyEvent::Stomper->new(
   },
 );
 
-my $cv = AE::cv;
-
+my $cv     = AE::cv;
 my $sub_id = 'foo';
 my $dst    = '/queue/foo';
 
@@ -55,8 +53,9 @@ $stomper->subscribe(
       print "Consumed: $body\n";
 
       $stomper->ack(
-        id      => $headers->{ack},
-        receipt => 'auto',
+        id           => $headers->{ack},
+        subscription => $sub_id,
+        receipt      => 'auto',
 
         sub {
           my $receipt = shift;
@@ -94,6 +93,7 @@ my $on_signal = sub {
 
       print "Unsubscribed from $sub_id\n";
 
+
       $cv->send;
     }
   );
@@ -103,3 +103,5 @@ my $int_w  = AE::signal( INT  => $on_signal );
 my $term_w = AE::signal( TERM => $on_signal );
 
 $cv->recv;
+
+$stomper->force_disconnect;

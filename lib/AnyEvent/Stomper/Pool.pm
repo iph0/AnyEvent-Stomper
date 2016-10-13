@@ -72,30 +72,18 @@ sub random {
 sub next {
   my $self = shift;
 
-  unless ( @{ $self->{_temp_list} } ) {
-    $self->{_temp_list} = [ @{ $self->{_nodes_list} } ];
+  unless ( $self->{_node_index} < $self->{_pool_size} ) {
+    $self->{_node_index} = 0;
   }
 
-  return shift @{ $self->{_temp_list} };
+  return $self->{_nodes_list}[ $self->{_node_index}++ ];
 }
 
-sub next_random {
-  my $self = shift;
-
-  unless ( @{ $self->{_temp_list} } ) {
-    $self->{_temp_list} = [ @{ $self->{_nodes_list} } ];
-  }
-
-  my $rand_index = int( rand( scalar @{ $self->{_temp_list} } ) );
-
-  return splice( @{ $self->{_temp_list} }, $rand_index, 1 );
-}
-
-sub disconnect {
+sub force_disconnect {
   my $self = shift;
 
   foreach my $node ( @{ $self->{_nodes_list} } ) {
-    $node->destroy;
+    $node->force_disconnect;
   }
   $self->_reset_internals;
 
@@ -187,7 +175,7 @@ sub _reset_internals {
   $self->{_nodes_idx}  = {};
   $self->{_nodes_list} = [];
   $self->{_pool_size}  = undef;
-  $self->{_temp_list}  = [];
+  $self->{_node_index} = 0;
 
   return;
 }
