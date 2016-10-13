@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.02';
+our $VERSION = '0.04';
 
 use AnyEvent::Stomper;
 use Scalar::Util qw( weaken );
@@ -34,7 +34,7 @@ sub new {
   $self->{on_node_error}      = $params{on_node_error};
 
   my %node_params;
-  foreach my $name ( qw( login passcode vhost heart_beat connection_timeout
+  foreach my $name ( qw( login passcode vhost heartbeat connection_timeout
       reconnect_interval handle_params lazy ) )
   {
     next unless defined $params{$name};
@@ -196,9 +196,9 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
   my $pool = AnyEvent::Stomper::Pool->new(
     nodes => [
-      { host => 'mq-broker-1.com', port => 61613 },
-      { host => 'mq-broker-2.com', port => 61613 },
-      { host => 'mq-broker-3.com', port => 61613 },
+      { host => 'stomp-server-1.com', port => 61613 },
+      { host => 'stomp-server-2.com', port => 61613 },
+      { host => 'stomp-server-3.com', port => 61613 },
     ],
     login    => 'guest',
     passcode => 'guest',
@@ -243,7 +243,7 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 =head1 DESCRIPTION
 
 AnyEvent::Stomper::Pool is connection pool for AnyEvent::Stomper. This module
-can be used to work with cluster of queue brokers.
+can be used to work with cluster or set of STOMP servers.
 
 =head1 CONSTRUCTOR
 
@@ -251,14 +251,14 @@ can be used to work with cluster of queue brokers.
 
   my $stomper = AnyEvent::Stomper::Pool->new(
     nodes => [
-      { host => 'mq-broker-1.com', port => 61613 },
-      { host => 'mq-broker-2.com', port => 61613 },
-      { host => 'mq-broker-3.com', port => 61613 },
+      { host => 'stomp-server-1.com', port => 61613 },
+      { host => 'stomp-server-2.com', port => 61613 },
+      { host => 'stomp-server-3.com', port => 61613 },
     ],
     login              => 'guest',
     passcode           => 'guest',
     vhost              => '/',
-    heart_beat         => [ 5000, 5000 ],
+    heartbeat          => [ 5000, 5000 ],
     connection_timeout => 5,
     lazy               => 1,
     reconnect_interval => 5,
@@ -297,7 +297,7 @@ The password used to authenticate against a secured STOMP server.
 
 The name of a virtual host that the client wishes to connect to.
 
-=item heart_beat => \@heart_beat
+=item heartbeat => \@heartbeat
 
 Heart-beating can optionally be used to test the healthiness of the underlying
 TCP connection and to make sure that the remote end is alive and kicking. The
@@ -306,7 +306,7 @@ STOMP server. C<0> means, that the client will not send heart-beats. The second
 number sets interval in milliseconds between incoming heart-beats from the
 STOMP server. C<0> means, that the client does not want to receive heart-beats.
 
-  heart_beat => [ 5000, 5000 ],
+  heartbeat => [ 5000, 5000 ],
 
 Not set by default.
 

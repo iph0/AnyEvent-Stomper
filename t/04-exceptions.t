@@ -7,31 +7,31 @@ use Test::Fatal;
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Pool;
 
-t_heart_beat();
+t_heartbeat();
 t_conn_timeout();
 t_reconnect_interval();
 t_on_message();
 t_nodes();
 
-sub t_heart_beat {
+sub t_heartbeat {
    like(
     exception {
       my $stomper = AnyEvent::Stomper->new(
-        heart_beat => 'invalid',
+        heartbeat => 'invalid',
       );
     },
-    qr/"heart_beat" must be specified as array reference/,
-    'invalid "heart_beat" (character string)'
+    qr/"heartbeat" must be specified as array reference/,
+    'invalid "heartbeat" (character string)'
   );
 
   like(
     exception {
       my $stomper = AnyEvent::Stomper->new(
-        heart_beat => [ 'invalid', 'invalid' ],
+        heartbeat => [ 'invalid', 'invalid' ],
       );
     },
-    qr/"heart_beat" values must be an integer numbers/,
-    'invalid "heart_beat" values (character string)'
+    qr/"heartbeat" values must be an integer numbers/,
+    'invalid "heartbeat" values (character string)'
   );
 }
 

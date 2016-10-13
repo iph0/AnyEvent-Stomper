@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.02';
+our $VERSION = '0.04';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -26,9 +26,9 @@ BEGIN {
 
 use constant {
   # Default values
-  D_HOST       => 'localhost',
-  D_PORT       => 61613,
-  D_HEART_BEAT => [ 0, 0 ],
+  D_HOST      => 'localhost',
+  D_PORT      => 61613,
+  D_HEARTBEAT => [ 0, 0 ],
 
   %ERROR_CODES,
 
@@ -73,20 +73,20 @@ sub new {
   $self->{passcode} = $params{passcode};
   $self->{vhost}    = $params{vhost};
 
-  if ( defined $params{heart_beat} ) {
-    unless ( ref( $params{heart_beat} ) eq 'ARRAY' ) {
-      croak qq{"heart_beat" must be specified as array reference};
+  if ( defined $params{heartbeat} ) {
+    unless ( ref( $params{heartbeat} ) eq 'ARRAY' ) {
+      croak qq{"heartbeat" must be specified as array reference};
     }
-    foreach my $val ( @{ $params{heart_beat} } ) {
+    foreach my $val ( @{ $params{heartbeat} } ) {
       if ( $val =~ /\D/ ) {
-        croak qq{"heart_beat" values must be an integer numbers};
+        croak qq{"heartbeat" values must be an integer numbers};
       }
     }
 
-    $self->{heart_beat} = $params{heart_beat};
+    $self->{heartbeat} = $params{heartbeat};
   }
   else {
-    $self->{heart_beat} = D_HEART_BEAT;
+    $self->{heartbeat} = D_HEARTBEAT;
   }
 
   $self->{lazy}          = $params{lazy};
@@ -522,7 +522,7 @@ sub _push_write {
 sub _login {
   my $self = shift;
 
-  my ( $cx, $cy ) = @{ $self->{heart_beat} };
+  my ( $cx, $cy ) = @{ $self->{heartbeat} };
 
   if ( $cy > 0 ) {
     $self->_rtimeout($cy);
@@ -927,7 +927,7 @@ L<https://stomp.github.io/index.html>
     login              => 'guest',
     passcode           => 'guest',
     vhost              => '/',
-    heart_beat         => [ 5000, 5000 ],
+    heartbeat          => [ 5000, 5000 ],
     connection_timeout => 5,
     lazy               => 1,
     reconnect_interval => 5,
@@ -969,7 +969,7 @@ The password used to authenticate against a secured STOMP server.
 
 The name of a virtual host that the client wishes to connect to.
 
-=item heart_beat => \@heart_beat
+=item heartbeat => \@heartbeat
 
 Heart-beating can optionally be used to test the healthiness of the underlying
 TCP connection and to make sure that the remote end is alive and kicking. The
@@ -978,7 +978,7 @@ STOMP server. C<0> means, that the client will not send heart-beats. The second
 number sets interval in milliseconds between incoming heart-beats from the
 STOMP server. C<0> means, that the client does not want to receive heart-beats.
 
-  heart_beat => [ 5000, 5000 ],
+  heartbeat => [ 5000, 5000 ],
 
 Not set by default.
 
@@ -1072,8 +1072,8 @@ The command callback is optional. If it is not specified and any error
 occurred, the C<on_error> callback of the client is called.
 
 The full list of all available headers for every command you can find in STOMP
-protocol specification and in documentation on your queue broker. For various
-versions of STOMP protocol and various queue brokers they can be differ.
+protocol specification and in documentation on your STOMP server. For various
+versions of STOMP protocol and various STOMP servers they can be differ.
 
 =head2 send( [ %headers ] [, $cb->( $receipt, $err ) ] )
 
@@ -1129,10 +1129,25 @@ Sends a message to a destination in the messaging system.
 =head2 subscribe( [ %headers ] [, ( $cb->( $receipt, $err ) | \%cbs ) ] )
 
 The method is used to register to listen to a given destination. The
-C<subscribe> method require the C<on_message> callback, which is called when
-C<MESSAGE> frame from the server was received. The C<MESSAGE> frame is passed
+C<subscribe> method require the C<on_message> callback, which is called on
+every received C<MESSAGE> frame from the server. The C<MESSAGE> frame is passed
 to the C<on_message> callback in first argument as the object of the class
-L<AnyEvent::Stomper::Frame>.
+L<AnyEvent::Stomper::Frame>. If the C<subscribe> method is called with one
+callback, this callback will be act as C<on_message> callback.
+
+  $stomper->subscribe(
+    id          => 'foo',
+    destination => '/queue/foo',
+
+    sub {
+      my $msg = shift;
+
+      my $headers = $msg->headers;
+      my $body    = $msg->body;
+
+      # message handling...
+    },
+  );
 
   $stomper->subscribe(
     id          => 'foo',
@@ -1371,6 +1386,11 @@ Gets or sets the C<on_error> callback.
 
 The method for forced disconnection. All uncompleted operations will be
 aborted.
+
+=head1 CONNECTION POOL
+
+If you have the cluster or set of STOMP servers, you can use
+L<AnyEvent::Stomper::Pool> to work with them.
 
 =head1 SEE ALSO
 

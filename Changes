@@ -1,4 +1,8 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.04 Tue Nov 15 15:02:45 MSK 2016
+  - Renamed parameter "heart_beat" to "heartbeat".
+  - Improved POD.
+
 0.02 Tue Nov 15 12:33:20 MSK 2016
 	- Initial release.
