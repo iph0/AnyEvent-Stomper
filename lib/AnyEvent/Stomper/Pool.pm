@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.06';
+our $VERSION = '0.08';
 
 use AnyEvent::Stomper;
 use Scalar::Util qw( weaken );
@@ -263,15 +263,15 @@ can be used to work with cluster or set of STOMP servers.
     lazy               => 1,
     reconnect_interval => 5,
 
-    on_connect => sub {
+    on_node_connect => sub {
       # handling...
     },
 
-    on_disconnect => sub {
+    on_node_disconnect => sub {
       # handling...
     },
 
-    on_error => sub {
+    on_node_error => sub {
       my $err = shift;
 
       # error handling...
