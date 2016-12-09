@@ -31,45 +31,44 @@ $stomper->subscribe(
   destination => $dst,
   ack         => 'client-individual',
 
-  { on_receipt => sub {
-      my $receipt = shift;
-      my $err     = shift;
+  on_receipt => sub {
+    my $receipt = shift;
+    my $err     = shift;
 
-      if ( defined $err ) {
-        warn $err->message . "\n";
-        $cv->send;
+    if ( defined $err ) {
+      warn $err->message . "\n";
+      $cv->send;
 
-        return;
-      }
+      return;
+    }
 
-      print "Subscribed to $sub_id\n";
-    },
+    print "Subscribed to $sub_id\n";
+  },
 
-    on_message => sub {
-      my $msg = shift;
+  on_message => sub {
+    my $msg = shift;
 
-      my $headers = $msg->headers;
-      my $body    = $msg->body;
+    my $headers = $msg->headers;
+    my $body    = $msg->body;
 
-      print "Consumed: $body\n";
+    print "Consumed: $body\n";
 
-      $stomper->ack(
-        id      => $headers->{ack},
-        receipt => 'auto',
+    $stomper->ack(
+      id      => $headers->{ack},
+      receipt => 'auto',
 
-        sub {
-          my $receipt = shift;
-          my $err     = shift;
+      sub {
+        my $receipt = shift;
+        my $err     = shift;
 
-          if ( defined $err ) {
-            warn $err->message . "\n";
-            return;
-          }
-
-          print "Acked: $headers->{ack}\n";
+        if ( defined $err ) {
+          warn $err->message . "\n";
+          return;
         }
-      );
-    },
+
+        print "Acked: $headers->{ack}\n";
+      }
+    );
   }
 );
 

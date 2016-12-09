@@ -5,8 +5,9 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09_01';
 
+use AnyEvent::Stomper::JSON;
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
 
@@ -98,6 +99,7 @@ sub new {
   $self->reconnect_interval( $params{reconnect_interval} );
   $self->on_error( $params{on_error} );
 
+  $self->{_json} = AnyEvent::Stomper::JSON->new;
   $self->_reset_internals;
   $self->{_input_queue}      = [];
   $self->{_temp_queue}       = [];
@@ -379,29 +381,31 @@ sub _prepare {
   my $cmd_name = uc(shift);
   my $args     = shift;
 
-  my $cbs;
-  if ( ref( $args->[-1] ) eq 'HASH' ) {
-    $cbs = pop @{$args};
-  }
-  else {
-    $cbs = {};
-    if ( ref( $args->[-1] ) eq 'CODE' ) {
-      if ( $cmd_name eq 'SUBSCRIBE' ) {
-        $cbs->{on_message} = pop @{$args};
-      }
-      else {
-        $cbs->{on_receipt} = pop @{$args};
-      }
+  my %cbs;
+  if ( ref( $args->[-1] ) eq 'CODE'
+    && scalar @{$args} % 2 > 0 )
+  {
+    if ( $cmd_name eq 'SUBSCRIBE' ) {
+      $cbs{on_message} = pop @{$args};
+    }
+    else {
+      $cbs{on_receipt} = pop @{$args};
     }
   }
   my %cmd_headers = @{$args};
-  my $body        = delete $cmd_headers{body};
+  if ( defined $cmd_headers{on_receipt} ) {
+    $cbs{on_receipt} = delete $cmd_headers{on_receipt};
+  }
+  if ( defined $cmd_headers{on_message} ) {
+    $cbs{on_message} = delete $cmd_headers{on_message};
+  }
+  my $body = delete $cmd_headers{body};
 
   my $cmd = {
     name    => $cmd_name,
     headers => \%cmd_headers,
     body    => $body,
-    %{$cbs},
+    %cbs,
   };
 
   unless ( defined $cmd->{on_receipt} ) {
@@ -499,6 +503,12 @@ sub _push_write {
 
   unless ( defined $cmd->{body} ) {
     $cmd->{body} = '';
+  }
+  if ( defined $cmd_headers->{'content-type'}
+    && $cmd_headers->{'content-type'} =~ m/^application\/json/
+    && ref( $cmd->{body} ) )
+  {
+    $cmd->{body} = $self->{_json}->encode( $cmd->{body} );
   }
   unless ( defined $cmd_headers->{'content-length'} ) {
     $cmd_headers->{'content-length'} = length( $cmd->{body} );
@@ -880,30 +890,29 @@ AnyEvent::Stomper - Flexible non-blocking STOMP client
     id          => 'foo',
     destination => '/queue/foo',
 
-    { on_receipt => sub {
-        my $err = $_[1];
+    on_receipt => sub {
+      my $err = $_[1];
 
-        if ( defined $err ) {
-          warn $err->message . "\n";
-          $cv->send;
-
-          return;
-        }
-
-        $stomper->send(
-          destination => '/queue/foo',
-          body        => 'Hello, world!',
-        );
-      },
-
-      on_message => sub {
-        my $msg = shift;
-
-        my $body = $msg->body;
-        print "Consumed: $body\n";
-
+      if ( defined $err ) {
+        warn $err->message . "\n";
         $cv->send;
-      },
+
+        return;
+      }
+
+      $stomper->send(
+        destination => '/queue/foo',
+        body        => 'Hello, world!',
+      );
+    },
+
+    on_message => sub {
+      my $msg = shift;
+
+      my $body = $msg->body;
+      print "Consumed: $body\n";
+
+      $cv->send;
     }
   );
 
@@ -1154,29 +1163,28 @@ callback, this callback will be act as C<on_message> callback.
     destination => '/queue/foo',
     ack         => 'client',
 
-    { on_receipt => sub {
-        my $receipt = shift;
-        my $err     = shift;
+    on_receipt => sub {
+      my $receipt = shift;
+      my $err     = shift;
 
-        if ( defined $err ) {
-          my $err_msg   = $err->message;
-          my $err_code  = $err->code;
-          my $err_frame = $err->frame;
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
 
-          return;
-        }
+        return;
+      }
 
-        # receipt handling...
-      },
+      # receipt handling...
+    },
 
-      on_message => sub {
-        my $msg = shift;
+    on_message => sub {
+      my $msg = shift;
 
-        my $headers = $msg->headers;
-        my $body    = $msg->body;
+      my $headers = $msg->headers;
+      my $body    = $msg->body;
 
-        # message handling...
-      },
+      # message handling...
     }
   );
 
@@ -1307,6 +1315,14 @@ convenient.
       # receipt handling...
     }
   );
+
+=head1 EMBEDDED JSON SERIALIZER
+
+The client has embedded JSON serializer. To use it you must specify
+C<content-type> header with the value C<application/json>. The body of outgoing
+frame with this header will be automaticaly serialized from Perl data structure
+to JSON before sending. To get deserialized body of incoming frame you must
+call C<decoded_body> method of C<AnyEvent::Stomper::Frame> class.
 
 =head1 ERROR CODES
 
