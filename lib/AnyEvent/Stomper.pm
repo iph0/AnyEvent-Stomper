@@ -100,6 +100,7 @@ sub new {
   $self->on_error( $params{on_error} );
 
   $self->{_json} = AnyEvent::Stomper::JSON->new;
+
   $self->_reset_internals;
   $self->{_input_queue}      = [];
   $self->{_temp_queue}       = [];
