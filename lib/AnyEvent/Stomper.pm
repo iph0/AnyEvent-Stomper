@@ -1319,9 +1319,9 @@ convenient.
 =head1 EMBEDDED JSON SERIALIZER
 
 The client has embedded JSON serializer. To use it you must specify
-C<content-type> header with the value C<application/json>. The body of outgoing
-frame with this header will be automaticaly serialized from Perl data structure
-to JSON before sending. To get deserialized body of incoming frame you must
+C<content-type> header with the value C<application/json> and the body of
+the outgoing frame will be automaticaly serialized from Perl data structure
+to JSON before sending. To get deserialized body of the incoming frame you must
 call C<decoded_body> method of C<AnyEvent::Stomper::Frame> class.
 
 =head1 ERROR CODES
