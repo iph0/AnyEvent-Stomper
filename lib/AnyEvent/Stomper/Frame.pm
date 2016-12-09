@@ -49,7 +49,7 @@ sub decoded_body {
     if ( $headers->{'content-type'} =~ m/^application\/json/ ) {
       return $self->{_json}->decode( $self->{body} );
     }
-    if ( $headers->{'content-type'} =~ m/charset=([^\s;]+)/ ) {
+    if ( $headers->{'content-type'} =~ m/;\s*charset=([^\s;]+)/ ) {
       return decode( $1, $self->{body} );
     }
   }
