@@ -7,7 +7,6 @@ use base qw( Exporter );
 
 our $VERSION = '0.09_01';
 
-use AnyEvent::Stomper::JSON;
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
 
@@ -98,8 +97,6 @@ sub new {
   $self->connection_timeout( $params{connection_timeout} );
   $self->reconnect_interval( $params{reconnect_interval} );
   $self->on_error( $params{on_error} );
-
-  $self->{_json} = AnyEvent::Stomper::JSON->new;
 
   $self->_reset_internals;
   $self->{_input_queue}      = [];

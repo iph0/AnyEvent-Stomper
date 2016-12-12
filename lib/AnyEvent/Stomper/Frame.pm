@@ -6,7 +6,6 @@ use warnings;
 
 our $VERSION = '0.09_01';
 
-use AnyEvent::Stomper::JSON;
 use Encode qw( decode );
 
 
@@ -21,8 +20,6 @@ sub new {
   $self->{command} = $command;
   $self->{headers} = $headers || {};
   $self->{body}    = $body || '';
-
-  $self->{_json} = AnyEvent::Stomper::JSON->new;
 
   return $self;
 }
