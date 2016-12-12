@@ -1064,8 +1064,8 @@ For commands C<SUBSCRIBE>, C<UNSUBSCRIBE>, C<DISCONNECT> the client
 automatically adds C<receipt> header for internal usage.
 
 The command callback is called after successful sending of the command to the
-server or when C<RECEIPT> frame will be received, in case if C<receipt> header
-is specified. If any error occurred during the command execution, the error
+server or when C<RECEIPT> frame will be received if C<receipt> header
+was specified. If any error occurred during the command execution, the error
 object is passed to the callback in second argument. Error object is the
 instance of the class L<AnyEvent::Stomper::Error>.
 
@@ -1076,7 +1076,7 @@ The full list of all available headers for every command you can find in STOMP
 protocol specification and in documentation on your STOMP server. For various
 versions of STOMP protocol and various STOMP servers they can be differ.
 
-=head2 send( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 send( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 Sends a message to a destination in the messaging system.
 
@@ -1109,7 +1109,7 @@ Sends a message to a destination in the messaging system.
     receipt     => 'auto',
     body        => 'Hello, world!',
 
-    sub {
+    on_receipt => sub {
       my $receipt = shift;
       my $err     = shift;
 
@@ -1127,7 +1127,7 @@ Sends a message to a destination in the messaging system.
     }
   );
 
-=head2 subscribe( [ %headers, ] ( $cb->( $msg ) | \%cbs ) )
+=head2 subscribe( [ %headers ] [, %params ] [, $cb->( $msg ) ] )
 
 The method is used to register to listen to a given destination. The
 C<subscribe> method require the C<on_message> callback, which is called on
@@ -1180,7 +1180,7 @@ callback, this callback will be act as C<on_message> callback.
     }
   );
 
-=head2 unsubscribe( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 unsubscribe( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 The method is used to remove an existing subscription.
 
@@ -1204,7 +1204,7 @@ The method is used to remove an existing subscription.
     }
   );
 
-=head2 ack( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 ack( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 The method is used to acknowledge consumption of a message from a subscription
 using C<client> or C<client-individual> acknowledgment. Any messages received
@@ -1233,7 +1233,7 @@ message has been acknowledged via an C<ack()> method.
     }
   );
 
-=head2 nack( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 nack( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 The C<nack> method is the opposite of C<ack> method. It is used to tell the
 server that the client did not consume the message.
@@ -1260,19 +1260,19 @@ server that the client did not consume the message.
     }
   );
 
-=head2 begin( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 begin( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<begin> is used to start a transaction.
 
-=head2 commit( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 commit( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<commit> is used to commit a transaction.
 
-=head2 abort( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 abort([ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<abort> is used to roll back a transaction.
 
-=head2 disconnect( [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 disconnect( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 A client can disconnect from the server at anytime by closing the socket but
 there is no guarantee that the previously sent frames have been received by
@@ -1280,7 +1280,7 @@ the server. To do a graceful shutdown, where the client is assured that all
 previous frames have been received by the server, you must call C<disconnect>
 method and wait for the C<RECEIPT> frame.
 
-=head2 execute( $command, [ %headers ] [, $cb->( $receipt, $err ) ] )
+=head2 execute( $command, [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
 
 An alternative method to execute commands. In some cases it can be more
 convenient.
