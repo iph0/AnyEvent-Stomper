@@ -505,12 +505,6 @@ sub _push_write {
   unless ( defined $cmd->{body} ) {
     $cmd->{body} = '';
   }
-  if ( defined $cmd_headers->{'content-type'}
-    && $cmd_headers->{'content-type'} =~ m/^application\/json/
-    && ref( $cmd->{body} ) )
-  {
-    $cmd->{body} = $self->{_json}->encode( $cmd->{body} );
-  }
   unless ( defined $cmd_headers->{'content-length'} ) {
     $cmd_headers->{'content-length'} = length( $cmd->{body} );
   }
@@ -1316,14 +1310,6 @@ convenient.
       # receipt handling...
     }
   );
-
-=head1 EMBEDDED JSON SERIALIZER
-
-The client has embedded JSON serializer. To use it you must specify
-C<content-type> header with the value C<application/json> and the body of
-the outgoing frame will be automaticaly serialized from Perl data structure
-to JSON before sending. To get deserialized body of the incoming frame you must
-call C<decoded_body> method of C<AnyEvent::Stomper::Frame> class.
 
 =head1 ERROR CODES
 

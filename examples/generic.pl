@@ -5,7 +5,6 @@ use warnings;
 
 use AnyEvent;
 use AnyEvent::Stomper;
-use Data::Dumper;
 
 my $stomper = AnyEvent::Stomper->new(
   host       => 'localhost',
@@ -43,13 +42,9 @@ $stomper->subscribe(
     print "Subscribed to $sub_id\n";
 
     $stomper->send(
-      destination    => $dst,
-      persistent     => 'true',
-      'content-type' => 'application/json',
-      body           => {
-        foo => 'Hello, foo!',
-        bar => 'Hello, bar!',
-      },
+      destination => $dst,
+      persistent  => 'true',
+      body        => 'Hello, world!',
     );
   },
 
@@ -57,9 +52,9 @@ $stomper->subscribe(
     my $msg = shift;
 
     my $headers = $msg->headers;
-    my $body    = $msg->decoded_body;
+    my $body    = $msg->body;
 
-    print Dumper($body);
+    print "Consumed: $body\n";
 
     $cv->send;
   }

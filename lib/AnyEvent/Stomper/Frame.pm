@@ -45,13 +45,10 @@ sub decoded_body {
 
   my $headers = $self->{headers};
 
-  if ( defined $headers->{'content-type'} ) {
-    if ( $headers->{'content-type'} =~ m/^application\/json/ ) {
-      return $self->{_json}->decode( $self->{body} );
-    }
-    if ( $headers->{'content-type'} =~ m/;\s*charset=([^\s;]+)/ ) {
-      return decode( $1, $self->{body} );
-    }
+  if ( defined $headers->{'content-type'}
+    && $headers->{'content-type'} =~ m/;\s*charset=([^\s;]+)/ )
+  {
+    return decode( $1, $self->{body} );
   }
 
   return $self->{body};
@@ -91,9 +88,7 @@ Gets frame body
 
 =head2 decoded_body()
 
-Gets decoded frame body. If the frame has C<content-type> header with the value
-C<application/json>, the body will be deserialized from JSON into Perl
-data structure.
+Gets decoded frame body.
 
 =head1 SEE ALSO
 
