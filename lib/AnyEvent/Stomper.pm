@@ -1005,7 +1005,7 @@ Disabled by default.
 =item reconnect_interval => $reconnect_interval
 
 If the parameter is specified, the client will try to reconnect only after
-this interval. Commands executed between reconnections will be queued.
+this interval. Commands executed between performance will be queued.
 
   reconnect_interval => 5,
 
@@ -1020,7 +1020,7 @@ Specifies L<AnyEvent::Handle> parameters.
     linger   => 60,
   }
 
-Enabling of the C<autocork> parameter can improve perfomance. See
+Enabling of the C<autocork> parameter can improve performance. See
 documentation on L<AnyEvent::Handle> for more information.
 
 =item on_connect => $cb->()
@@ -1050,11 +1050,11 @@ an error messages to C<STDERR>.
 =head1 COMMAND METHODS
 
 To execute the STOMP command you must call appropriate method. STOMP headers
-can be specigfied as command parameters. The client automatically adds
+can be specified as command parameters. The client automatically adds
 C<content-length> header to all outgoing frames. Every command method also can
-accept two special parameters: the C<body> parameter where you can specify the
-body of the frame, and the C<on_receipt> parameter that is the alternative way
-to specify the command callback.
+accept two additional parameters: the C<body> parameter where you can specify
+the body of the frame, and the C<on_receipt> parameter that is the alternative
+way to specify the command callback.
 
 If you want to receive C<RECEIPT> frame, you must specify C<receipt> header.
 The C<receipt> header can take special value C<auto>. In this case the
