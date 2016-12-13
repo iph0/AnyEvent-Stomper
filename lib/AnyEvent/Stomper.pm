@@ -1051,7 +1051,7 @@ an error messages to C<STDERR>.
 
 To execute the STOMP command you must call appropriate method. STOMP headers
 can be specified as command parameters. The client automatically adds
-C<content-length> header to all outgoing frames. Every command method also can
+C<content-length> header to all outgoing frames. Every command method can also
 accept two additional parameters: the C<body> parameter where you can specify
 the body of the frame, and the C<on_receipt> parameter that is the alternative
 way to specify the command callback.
