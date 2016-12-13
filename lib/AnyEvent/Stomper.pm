@@ -1049,9 +1049,12 @@ an error messages to C<STDERR>.
 
 =head1 COMMAND METHODS
 
-To execute the STOMP command you must call appropriate method. The client
-automatically adds C<content-length> header to all outgoing frames. The body of
-the frame you can specify in C<body> parameter of the command method.
+To execute the STOMP command you must call appropriate method. STOMP headers
+can be specigfied as command parameters. The client automatically adds
+C<content-length> header to all outgoing frames. Every command method also can
+accept two special parameters: the C<body> parameter where you can specify the
+body of the frame, and the C<on_receipt> parameter that is the alternative way
+to specify the command callback.
 
 If you want to receive C<RECEIPT> frame, you must specify C<receipt> header.
 The C<receipt> header can take special value C<auto>. In this case the
@@ -1076,7 +1079,7 @@ The full list of all available headers for every command you can find in STOMP
 protocol specification and in documentation on your STOMP server. For various
 versions of STOMP protocol and various STOMP servers they can be differ.
 
-=head2 send( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 send( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 Sends a message to a destination in the messaging system.
 
@@ -1127,7 +1130,7 @@ Sends a message to a destination in the messaging system.
     }
   );
 
-=head2 subscribe( [ %headers ] [, %params ] [, $cb->( $msg ) ] )
+=head2 subscribe( [ %params ] [, $cb->( $msg ) ] )
 
 The method is used to register to listen to a given destination. The
 C<subscribe> method require the C<on_message> callback, which is called on
@@ -1180,7 +1183,7 @@ callback, this callback will be act as C<on_message> callback.
     }
   );
 
-=head2 unsubscribe( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 unsubscribe( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The method is used to remove an existing subscription.
 
@@ -1204,7 +1207,7 @@ The method is used to remove an existing subscription.
     }
   );
 
-=head2 ack( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 ack( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The method is used to acknowledge consumption of a message from a subscription
 using C<client> or C<client-individual> acknowledgment. Any messages received
@@ -1233,7 +1236,7 @@ message has been acknowledged via an C<ack()> method.
     }
   );
 
-=head2 nack( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 nack( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The C<nack> method is the opposite of C<ack> method. It is used to tell the
 server that the client did not consume the message.
@@ -1260,19 +1263,19 @@ server that the client did not consume the message.
     }
   );
 
-=head2 begin( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 begin( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<begin> is used to start a transaction.
 
-=head2 commit( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 commit( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<commit> is used to commit a transaction.
 
-=head2 abort([ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 abort([ %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<abort> is used to roll back a transaction.
 
-=head2 disconnect( [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 disconnect( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 A client can disconnect from the server at anytime by closing the socket but
 there is no guarantee that the previously sent frames have been received by
@@ -1280,7 +1283,7 @@ the server. To do a graceful shutdown, where the client is assured that all
 previous frames have been received by the server, you must call C<disconnect>
 method and wait for the C<RECEIPT> frame.
 
-=head2 execute( $command, [ %headers ] [, %params ] [, $cb->( $receipt, $err ) ] )
+=head2 execute( $command, [ %params ] [, $cb->( $receipt, $err ) ] )
 
 An alternative method to execute commands. In some cases it can be more
 convenient.
