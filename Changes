@@ -1,5 +1,9 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.10 MSK 2016
+  - The "on_receipt" and "on_message" callbacks now must be specified without
+    hash reference. Backward compatible was broken.
+
 0.08 Wed Nov 16 11:33:55 MSK 2016
   - Fixed incorrect example in POD.
 
