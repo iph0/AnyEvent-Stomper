@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.12';
+our $VERSION = '0.14';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -450,6 +450,8 @@ sub _execute {
         && $self->{reconnect_interval} > 0 )
       {
         unless ( defined $self->{_reconnect_timer} ) {
+          weaken($self);
+
           $self->{_reconnect_timer} = AE::timer(
             $self->{reconnect_interval}, 0,
             sub {

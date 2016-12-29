@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.14 Thu Dec 29 15:16:45 MSK 2016
+  - Weakened one more circular reference.
+
 0.12 Wed Dec 14 17:03:50 MSK 2016
   - Light changes in POD.
 
