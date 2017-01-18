@@ -2,7 +2,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-use Test::More tests => 18;
+use Test::More tests => 17;
 
 my $t_client_class;
 my $t_pool_class;
@@ -44,7 +44,6 @@ my $frame = new_ok( $t_frame_class => [ 'MESSAGE', { 'message-id' => '123' },
 can_ok( $frame, 'command' );
 can_ok( $frame, 'headers' );
 can_ok( $frame, 'body' );
-can_ok( $frame, 'decoded_body' );
 
 can_ok( $t_err_class, 'new' );
 my $err = new_ok( $t_err_class => [ 'Some error', 6 ] );

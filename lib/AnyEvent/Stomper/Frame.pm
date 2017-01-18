@@ -4,22 +4,22 @@ use 5.008000;
 use strict;
 use warnings;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15_01';
 
 use Encode qw( decode );
 
 
 sub new {
-  my $class    = shift;
-  my $command  = shift;
-  my $headers  = shift;
-  my $body     = shift;
+  my $class   = shift;
+  my $command = shift;
+  my $headers = shift;
+  my $body    = shift;
 
   my $self = bless {}, $class;
 
   $self->{command} = $command;
-  $self->{headers} = $headers || {};
-  $self->{body}    = $body || '';
+  $self->{headers} = $headers;
+  $self->{body}    = $body;
 
   return $self;
 }
@@ -35,20 +35,6 @@ sub new {
       return $self->{$name};
     }
   }
-}
-
-sub decoded_body {
-  my $self = shift;
-
-  my $headers = $self->{headers};
-
-  if ( defined $headers->{'content-type'}
-    && $headers->{'content-type'} =~ m/;\s*charset=([^\s;]+)/ )
-  {
-    return decode( $1, $self->{body} );
-  }
-
-  return $self->{body};
 }
 
 1;

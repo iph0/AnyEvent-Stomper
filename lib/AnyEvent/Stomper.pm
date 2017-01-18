@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.14';
+our $VERSION = '0.15_01';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -69,9 +69,15 @@ sub new {
 
   $self->{host} = $params{host} || D_HOST;
   $self->{port} = $params{port} || D_PORT;
-  $self->{login}    = $params{login};
-  $self->{passcode} = $params{passcode};
-  $self->{vhost}    = $params{vhost};
+  $self->{login}         = $params{login};
+  $self->{passcode}      = $params{passcode};
+  $self->{vhost}         = $params{vhost};
+  $self->{lazy}          = $params{lazy};
+  $self->{handle_params} = $params{handle_params} || {};
+  $self->{body_encoder}  = $params{body_encoder};
+  $self->{body_decoder}  = $params{body_decoder};
+  $self->{on_connect}    = $params{on_connect};
+  $self->{on_disconnect} = $params{on_disconnect};
 
   if ( defined $params{heartbeat} ) {
     unless ( ref( $params{heartbeat} ) eq 'ARRAY' ) {
@@ -89,10 +95,11 @@ sub new {
     $self->{heartbeat} = D_HEARTBEAT;
   }
 
-  $self->{lazy}          = $params{lazy};
-  $self->{handle_params} = $params{handle_params} || {};
-  $self->{on_connect}    = $params{on_connect};
-  $self->{on_disconnect} = $params{on_disconnect};
+  my %default_headers;
+  while ( my ( $cmd_name, $headers ) = each %{ $params{default_headers} } ) {
+    $default_headers{ uc($cmd_name) } = $headers;
+  }
+  $self->{default_headers} = \%default_headers;
 
   $self->connection_timeout( $params{connection_timeout} );
   $self->reconnect_interval( $params{reconnect_interval} );
@@ -338,7 +345,6 @@ sub _create_on_read {
 
       if ( defined $cmd_name ) {
         my $content_length = $headers->{'content-length'};
-
         if ( defined $content_length ) {
           return if length( $handle->{rbuf} ) < $content_length + 1;
         }
@@ -348,6 +354,12 @@ sub _create_on_read {
         }
 
         my $body = substr( $handle->{rbuf}, 0, $content_length, '' );
+        if ( defined $self->{body_decoder}
+          && length($body) > 0 )
+        {
+          $body = $self->{body_decoder}->( $body, $headers->{'content-type'} );
+        }
+
         $handle->{rbuf} =~ s/^\0(?:${\(RE_EOL)})*//;
 
         $frame = _new_frame( $cmd_name, $headers, $body );
@@ -361,6 +373,7 @@ sub _create_on_read {
         return unless $handle->{rbuf} =~ s/^(.+?)(?:${\(RE_EOL)}){2}//s;
 
         ( $cmd_name, my @header_strings ) = split( m/${\(RE_EOL)}/, $1 );
+
         foreach my $header_str (@header_strings) {
           my ( $name, $value ) = split( /:/, $header_str, 2 );
           $headers->{ _unescape($name) } = _unescape($value);
@@ -390,18 +403,32 @@ sub _prepare {
       $cbs{on_receipt} = pop @{$args};
     }
   }
-  my %cmd_headers = @{$args};
-  if ( defined $cmd_headers{on_receipt} ) {
-    $cbs{on_receipt} = delete $cmd_headers{on_receipt};
+
+  my $default_headers = $self->{default_headers};
+
+  my %headers = (
+    defined $default_headers->{COMMON}
+    ? %{ $default_headers->{COMMON} }
+    : (),
+
+    defined $default_headers->{$cmd_name}
+    ? %{ $default_headers->{$cmd_name} }
+    : (),
+
+    @{$args},
+  );
+
+  foreach my $name ( qw( on_receipt on_message ) ) {
+    if ( defined $headers{$name} ) {
+      $cbs{$name} = delete $headers{$name};
+    }
   }
-  if ( defined $cmd_headers{on_message} ) {
-    $cbs{on_message} = delete $cmd_headers{on_message};
-  }
-  my $body = delete $cmd_headers{body};
+
+  my $body = delete $headers{body};
 
   my $cmd = {
     name    => $cmd_name,
-    headers => \%cmd_headers,
+    headers => \%headers,
     body    => $body,
     %cbs,
   };
@@ -480,39 +507,48 @@ sub _push_write {
   my $self = shift;
   my $cmd  = shift;
 
-  my $cmd_headers = $cmd->{headers};
+  my $headers = $cmd->{headers};
 
   my $need_receipt;
   if ( exists $NEED_RECEIPT{ $cmd->{name} }
-    || defined $cmd_headers->{receipt} )
+    || defined $headers->{receipt} )
   {
     $need_receipt = 1;
     if ( $cmd->{name} eq 'CONNECT' ) {
       $self->{_pending_receipts}{CONNECTED} = $cmd;
     }
     else {
-      if ( !defined $cmd_headers->{receipt}
-        || $cmd_headers->{receipt} eq 'auto' )
+      if ( !defined $headers->{receipt}
+        || $headers->{receipt} eq 'auto' )
       {
-        $cmd_headers->{receipt} = $self->{_session_id} . '@@'
+        $headers->{receipt} = $self->{_session_id} . '@@'
             . $self->{_receipt_seq}++;
       }
-      $self->{_pending_receipts}{ $cmd_headers->{receipt} } = $cmd;
+      $self->{_pending_receipts}{ $headers->{receipt} } = $cmd;
     }
   }
 
-  unless ( defined $cmd->{body} ) {
-    $cmd->{body} = '';
+  my $body = $cmd->{body};
+  unless ( defined $body ) {
+    $body = '';
   }
-  unless ( defined $cmd_headers->{'content-length'} ) {
-    $cmd_headers->{'content-length'} = length( $cmd->{body} );
+  if ( defined $self->{body_encoder}
+    && length($body) > 0 )
+  {
+    $body = $self->{body_encoder}->( $body, $headers->{'content-type'} );
+  }
+  unless ( defined $headers->{'content-length'} ) {
+    $headers->{'content-length'} = length($body);
   }
 
-  my $frame_str = uc( $cmd->{name} ) . EOL;
-  while ( my ( $name, $value ) = each %{$cmd_headers} ) {
+  my $frame_str = $cmd->{name} . EOL;
+  while ( my ( $name, $value ) = each %{$headers} ) {
+    unless ( defined $value ) {
+      $value = '';
+    }
     $frame_str .= _escape($name) . ':' . _escape($value) . EOL;
   }
-  $frame_str .= EOL . $cmd->{body} . "\0";
+  $frame_str .= EOL . "$body\0";
 
   $self->{_handle}->push_write($frame_str);
 
@@ -688,8 +724,8 @@ sub _process_receipt {
   }
 
   if ( exists $SUBUNSUB_CMDS{ $cmd->{name} } ) {
-    my $cmd_headers = $cmd->{headers};
-    my $sub_id = $cmd_headers->{id} || $cmd_headers->{destination};
+    my $headers = $cmd->{headers};
+    my $sub_id  = $headers->{id} || $headers->{destination};
 
     if ( $cmd->{name} eq 'SUBSCRIBE' ) {
       $self->{_subs}{$sub_id} = $cmd;
