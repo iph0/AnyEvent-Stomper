@@ -67,25 +67,27 @@ sub new {
 
   my $self = bless {}, $class;
 
-  $self->{host} = $params{host} || D_HOST;
-  $self->{port} = $params{port} || D_PORT;
-  $self->{login}         = $params{login};
-  $self->{passcode}      = $params{passcode};
-  $self->{vhost}         = $params{vhost};
-  $self->{lazy}          = $params{lazy};
-  $self->{handle_params} = $params{handle_params} || {};
-  $self->{body_encoder}  = $params{body_encoder};
-  $self->{body_decoder}  = $params{body_decoder};
-  $self->{on_connect}    = $params{on_connect};
-  $self->{on_disconnect} = $params{on_disconnect};
+  $self->{host}            = $params{host} || D_HOST;
+  $self->{port}            = $params{port} || D_PORT;
+  $self->{login}           = $params{login};
+  $self->{passcode}        = $params{passcode};
+  $self->{vhost}           = $params{vhost};
+  $self->{lazy}            = $params{lazy};
+  $self->{handle_params}   = $params{handle_params} || {};
+  $self->{default_headers} = $params{default_headers} || {};
+  $self->{body_encoder}    = $params{body_encoder};
+  $self->{body_decoder}    = $params{body_decoder};
+  $self->{on_connect}      = $params{on_connect};
+  $self->{on_disconnect}   = $params{on_disconnect};
 
   if ( defined $params{heartbeat} ) {
     unless ( ref( $params{heartbeat} ) eq 'ARRAY' ) {
-      croak qq{"heartbeat" must be specified as array reference};
+      croak q{"heartbeat" must be specified as array reference};
     }
+
     foreach my $val ( @{ $params{heartbeat} } ) {
       if ( $val =~ /\D/ ) {
-        croak qq{"heartbeat" values must be an integer numbers};
+        croak q{"heartbeat" values must be an integer numbers};
       }
     }
 
@@ -95,11 +97,17 @@ sub new {
     $self->{heartbeat} = D_HEARTBEAT;
   }
 
-  my %default_headers;
-  while ( my ( $cmd_name, $headers ) = each %{ $params{default_headers} } ) {
-    $default_headers{ uc($cmd_name) } = $headers;
+  if ( defined $params{command_headers} ) {
+    unless ( ref( $params{command_headers} ) eq 'HASH' ) {
+      croak q{"command_headers" must be specified as hash reference};
+    }
+
+    my %command_headers;
+    while ( my ( $cmd_name, $headers ) = each %{ $params{command_headers} } ) {
+      $command_headers{ uc($cmd_name) } = $headers;
+    }
+    $self->{command_headers} = \%command_headers;
   }
-  $self->{default_headers} = \%default_headers;
 
   $self->connection_timeout( $params{connection_timeout} );
   $self->reconnect_interval( $params{reconnect_interval} );
@@ -344,8 +352,9 @@ sub _create_on_read {
       return if $handle->destroyed;
 
       if ( defined $cmd_name ) {
-        my $content_length = $headers->{'content-length'};
-        if ( defined $content_length ) {
+        my $content_length;
+        if ( defined $headers->{'content-length'} ) {
+          $content_length = $headers->{'content-length'};
           return if length( $handle->{rbuf} ) < $content_length + 1;
         }
         else {
@@ -354,9 +363,7 @@ sub _create_on_read {
         }
 
         my $body = substr( $handle->{rbuf}, 0, $content_length, '' );
-        if ( defined $self->{body_decoder}
-          && length($body) > 0 )
-        {
+        if ( defined $self->{body_decoder} && length($body) > 0 ) {
           $body = $self->{body_decoder}->( $body, $headers->{'content-type'} );
         }
 
@@ -404,27 +411,23 @@ sub _prepare {
     }
   }
 
-  my $default_headers = $self->{default_headers};
-
-  my %headers = (
-    defined $default_headers->{COMMON}
-    ? %{ $default_headers->{COMMON} }
-    : (),
-
-    defined $default_headers->{$cmd_name}
-    ? %{ $default_headers->{$cmd_name} }
-    : (),
-
-    @{$args},
-  );
-
+  my %headers = @{$args};
   foreach my $name ( qw( on_receipt on_message ) ) {
     if ( defined $headers{$name} ) {
       $cbs{$name} = delete $headers{$name};
     }
   }
-
   my $body = delete $headers{body};
+
+  %headers = (
+    %{ $self->{default_headers} },
+
+    defined $self->{command_headers}{$cmd_name}
+    ? %{ $self->{command_headers}{$cmd_name} }
+    : (),
+
+    %headers,
+  );
 
   my $cmd = {
     name    => $cmd_name,
@@ -532,9 +535,7 @@ sub _push_write {
   unless ( defined $body ) {
     $body = '';
   }
-  if ( defined $self->{body_encoder}
-    && length($body) > 0 )
-  {
+  if ( defined $self->{body_encoder} && length($body) > 0 ) {
     $body = $self->{body_encoder}->( $body, $headers->{'content-type'} );
   }
   unless ( defined $headers->{'content-length'} ) {
@@ -1060,6 +1061,50 @@ Specifies L<AnyEvent::Handle> parameters.
 
 Enabling of the C<autocork> parameter can improve performance. See
 documentation on L<AnyEvent::Handle> for more information.
+
+=item default_headers => \%headers
+
+Specifies default headers for all outgoing frames.
+
+  default_headers => {
+    'x-foo' => 'foo_value',
+    'x-bar' => 'bar_value',
+  }
+
+=item command_headers
+
+Specifies default headers for particular commands.
+
+  command_headers => {
+    SEND => {
+      receipt => 'auto',
+    },
+
+    SUBSCRIBE => {
+      durable => 'true',
+      ack     => 'client',
+    },
+  }
+
+=item body_encoder => $cb->( $body [, $content_type ] )
+
+Specifies the encode function for the body of the frame. The function accepts
+two arguments: the body and the content type of the body, and must return the
+encoded body.
+
+  body_encoder => sub {
+    return encode_json( $_[0] );
+  }
+
+=item body_decoder => $cb->( $body [, $content_type ] )
+
+Specifies the decode function for the body of the frame. The function accepts
+two arguments: the body and the content type of the body, and must return the
+decoded body.
+
+  body_decoder => sub {
+    return decode_json( $_[0] );
+  }
 
 =item on_connect => $cb->()
 
