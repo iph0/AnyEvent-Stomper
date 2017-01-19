@@ -363,8 +363,16 @@ sub _create_on_read {
         }
 
         my $body = substr( $handle->{rbuf}, 0, $content_length, '' );
-        if ( defined $self->{body_decoder} && length($body) > 0 ) {
-          $body = $self->{body_decoder}->( $body, $headers->{'content-type'} );
+        if ( defined $self->{body_decoder}
+          && length($body) > 0 )
+        {
+          $body = $self->{body_decoder}->(
+            $body,
+
+            defined $headers->{'content-type'}
+            ? $headers->{'content-type'}
+            : ()
+          );
         }
 
         $handle->{rbuf} =~ s/^\0(?:${\(RE_EOL)})*//;
@@ -535,8 +543,16 @@ sub _push_write {
   unless ( defined $body ) {
     $body = '';
   }
-  if ( defined $self->{body_encoder} && length($body) > 0 ) {
-    $body = $self->{body_encoder}->( $body, $headers->{'content-type'} );
+  if ( defined $self->{body_encoder}
+    && length($body) > 0 )
+  {
+    $body = $self->{body_encoder}->(
+      $body,
+
+      defined $headers->{'content-type'}
+      ? $headers->{'content-type'}
+      : ()
+    );
   }
   unless ( defined $headers->{'content-length'} ) {
     $headers->{'content-length'} = length($body);
@@ -1089,8 +1105,8 @@ Specifies default headers for particular commands.
 =item body_encoder => $cb->( $body [, $content_type ] )
 
 Specifies the encode function for the body of the frame. The function accepts
-two arguments: the body and the content type of the body, and must return the
-encoded body.
+two arguments: the body and the content type of the body if it specified in the
+frame. The function must return the encoded body.
 
   body_encoder => sub {
     return encode_json( $_[0] );
@@ -1099,8 +1115,8 @@ encoded body.
 =item body_decoder => $cb->( $body [, $content_type ] )
 
 Specifies the decode function for the body of the frame. The function accepts
-two arguments: the body and the content type of the body, and must return the
-decoded body.
+two arguments: the body and the content type of the body if it specified in the
+frame. The function must return the decoded body.
 
   body_decoder => sub {
     return decode_json( $_[0] );
