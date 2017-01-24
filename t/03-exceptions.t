@@ -5,7 +5,7 @@ use warnings;
 use Test::More tests => 14;
 use Test::Fatal;
 use AnyEvent::Stomper;
-use AnyEvent::Stomper::Pool;
+use AnyEvent::Stomper::Cluster;
 
 t_heartbeat();
 t_conn_timeout();
@@ -139,7 +139,7 @@ sub t_on_message {
 sub t_nodes {
   like(
     exception {
-      my $cluster = AnyEvent::Stomper::Pool->new();
+      my $cluster = AnyEvent::Stomper::Cluster->new();
     },
     qr/Nodes not specified/,
     'Nodes not specified'
@@ -147,7 +147,7 @@ sub t_nodes {
 
   like(
     exception {
-      my $cluster = AnyEvent::Stomper::Pool->new(
+      my $cluster = AnyEvent::Stomper::Cluster->new(
         nodes => {},
       );
     },
@@ -157,7 +157,7 @@ sub t_nodes {
 
   like(
     exception {
-      my $cluster = AnyEvent::Stomper::Pool->new(
+      my $cluster = AnyEvent::Stomper::Cluster->new(
         nodes => [],
       );
     },

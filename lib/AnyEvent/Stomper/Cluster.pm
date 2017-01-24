@@ -47,7 +47,7 @@ sub new {
 
   my %node_params;
   foreach my $name ( qw( login passcode vhost heartbeat connection_timeout
-      reconnect_interval handle_params lazy default_headers command_headers
+      reconnect_interval handle_params default_headers command_headers
       body_encoder body_decoder ) )
   {
     next unless defined $params{$name};
@@ -76,7 +76,7 @@ sub execute {
   no strict qw( refs );
 
   foreach my $name ( qw( send subscribe unsubscribe ack nack begin commit
-      abort disconnect ) )
+      abort ) )
   {
     *{$name} = sub {
       my $self = shift;
@@ -391,7 +391,6 @@ AnyEvent::Stomper::Cluster is the client for the cluster of STOMP servers.
     vhost              => '/',
     heartbeat          => [ 5000, 5000 ],
     connection_timeout => 5,
-    lazy               => 1,
     reconnect_interval => 5,
 
     on_node_connect => sub {
@@ -409,15 +408,117 @@ AnyEvent::Stomper::Cluster is the client for the cluster of STOMP servers.
     },
   );
 
-AnyEvent::Stomper::Cluster has same constructor parameters as
-L<AnyEvent::Stomper>, and few more parameters listed below.
-
 =over
 
 =item nodes => \@nodes
 
 Specifies the list of nodes. Parameter should contain array of hashes. Each
 hash should contain C<host> and C<port> elements.
+
+=item login => $login
+
+The user identifier used to authenticate against a secured STOMP server.
+
+=item passcode => $passcode
+
+The password used to authenticate against a secured STOMP server.
+
+=item vhost => $vhost
+
+The name of a virtual host that the client wishes to connect to.
+
+=item heartbeat => \@heartbeat
+
+Heart-beating can optionally be used to test the healthiness of the underlying
+TCP connection and to make sure that the remote end is alive and kicking. The
+first number sets interval in milliseconds between outgoing heart-beats to the
+STOMP server. C<0> means, that the client will not send heart-beats. The second
+number sets interval in milliseconds between incoming heart-beats from the
+STOMP server. C<0> means, that the client does not want to receive heart-beats.
+
+  heartbeat => [ 5000, 5000 ],
+
+Not set by default.
+
+=item connection_timeout => $connection_timeout
+
+Specifies connection timeout. If the client could not connect to the server
+after specified timeout, the C<on_error> callback is called with the
+C<E_CANT_CONN> error. The timeout specifies in seconds and can contain a
+fractional part.
+
+  connection_timeout => 10.5,
+
+By default the client use kernel's connection timeout.
+
+=item reconnect_interval => $reconnect_interval
+
+If the connection to the node was lost, the client will try to restore the
+connection when you execute next command. By default reconnection is performed
+immediately, on next command execution. If the C<reconnect_interval> parameter
+is specified, the client will try to reconnect only after this interval and
+commands executed between reconnections will be queued. The client will try to
+reconnect to every available node before raise the error.
+
+  reconnect_interval => 5,
+
+Not set by default.
+
+=item handle_params => \%params
+
+Specifies L<AnyEvent::Handle> parameters.
+
+  handle_params => {
+    autocork => 1,
+    linger   => 60,
+  }
+
+Enabling of the C<autocork> parameter can improve performance. See
+documentation on L<AnyEvent::Handle> for more information.
+
+=item default_headers => \%headers
+
+Specifies default headers for all outgoing frames.
+
+  default_headers => {
+    'x-foo' => 'foo_value',
+    'x-bar' => 'bar_value',
+  }
+
+=item command_headers
+
+Specifies default headers for particular commands.
+
+  command_headers => {
+    SEND => {
+      receipt => 'auto',
+    },
+
+    SUBSCRIBE => {
+      durable => 'true',
+      ack     => 'client',
+    },
+  }
+
+=item body_encoder => $cb->( $body [, $content_type ] )
+
+Specifies the encode function for the body of the frame. The function accepts
+two arguments: the body and the content type of the body if it specified in the
+frame. The function must return the encoded body.
+
+  body_encoder => sub {
+    return encode_json( $_[0] );
+  }
+
+=item body_decoder => $cb->( $body [, $content_type ] )
+
+Specifies the decode function for the body of the frame. The function accepts
+two arguments: the body and the content type of the body if it specified in the
+frame. The function must return the decoded body.
+
+  body_decoder => sub {
+    return decode_json( $_[0] );
+  }
 
 =item on_node_connect => $cb->( $host, $port )
 
@@ -449,7 +550,267 @@ Not set by default.
 
 =head1 COMMAND METHODS
 
-See documentation on L<AnyEvent::Stomper> to learn how execute STOMP commands.
+To execute the STOMP command you must call appropriate method. STOMP headers
+can be specified as command parameters. The client automatically adds
+C<content-length> header to all outgoing frames. Every command method can also
+accept two additional parameters: the C<body> parameter where you can specify
+the body of the frame, and the C<on_receipt> parameter that is the alternative
+way to specify the command callback.
+
+If you want to receive C<RECEIPT> frame, you must specify C<receipt> header.
+The C<receipt> header can take the special value C<auto>. If it set, the
+receipt identificator will be generated automatically by the client. The
+C<RECEIPT> frame is passed to the command callback in first argument as the
+object of the class L<AnyEvent::Stomper::Frame>. If the C<receipt> header is
+not specified the first argument of the command callback will be C<undef>.
+
+For commands C<SUBSCRIBE>, C<UNSUBSCRIBE>, C<DISCONNECT> the client
+automatically adds C<receipt> header for internal usage.
+
+The command callback is called in one of two cases depending on the presence of
+the C<receipt> header: when the command was successfully sent to the server or
+when the C<RECEIPT> frame will be received. If any error occurred during the
+command execution, the error object is passed to the callback in second
+argument. Error object is the instance of the class L<AnyEvent::Stomper::Error>.
+
+The command callback is optional. If it is not specified and any error
+occurred, the C<on_error> callback of the client is called.
+
+The full list of all available headers for every command you can find in STOMP
+protocol specification and in documentation on your STOMP server. For various
+versions of STOMP protocol and various STOMP servers they can be differ.
+
+=head2 send( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+Sends a message to a destination in the messaging system.
+
+  $stomper->send(
+    destination => '/queue/foo',
+    body        => 'Hello, world!',
+  );
+
+  $stomper->send(
+    destination => '/queue/foo',
+    body        => 'Hello, world!',
+
+    sub {
+      my $err = $_[1];
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        # error handling...
+
+        return;
+      }
+    }
+  );
+
+  $stomper->send(
+    destination => '/queue/foo',
+    receipt     => 'auto',
+    body        => 'Hello, world!',
+
+    on_receipt => sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        # error handling...
+
+        return;
+      }
+
+      # receipt handling...
+    }
+  );
+
+=head2 subscribe( [ %params ] [, $cb->( $msg ) ] )
+
+The method is used to register to listen to a given destination. The
+C<subscribe> method require the C<on_message> callback, which is called on
+every received C<MESSAGE> frame from the server. The C<MESSAGE> frame is passed
+to the C<on_message> callback in first argument as the object of the class
+L<AnyEvent::Stomper::Frame>. If the C<subscribe> method is called with one
+callback, this callback will be act as C<on_message> callback.
+
+  $stomper->subscribe(
+    id          => 'foo',
+    destination => '/queue/foo',
+
+    sub {
+      my $msg = shift;
+
+      my $headers = $msg->headers;
+      my $body    = $msg->body;
+
+      # message handling...
+    },
+  );
+
+  $stomper->subscribe(
+    id          => 'foo',
+    destination => '/queue/foo',
+    ack         => 'client',
+
+    on_receipt => sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        return;
+      }
+
+      # receipt handling...
+    },
+
+    on_message => sub {
+      my $msg = shift;
+
+      my $headers = $msg->headers;
+      my $body    = $msg->body;
+
+      # message handling...
+    }
+  );
+
+=head2 unsubscribe( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+The method is used to remove an existing subscription.
+
+  $stomper->unsubscribe(
+    id          => 'foo',
+    destination => '/queue/foo',
+
+    sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        return;
+      }
+
+      # receipt handling...
+    }
+  );
+
+=head2 ack( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+The method is used to acknowledge consumption of a message from a subscription
+using C<client> or C<client-individual> acknowledgment. Any messages received
+from such a subscription will not be considered to have been consumed until the
+message has been acknowledged via an C<ack()> method.
+
+  $stomper->ack( id => $ack_id );
+
+  $stomper->ack(
+    id      => $ack_id,
+    receipt => 'auto',
+
+    sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        # error handling...
+      }
+
+      # receipt handling...
+    }
+  );
+
+=head2 nack( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+The C<nack> method is the opposite of C<ack> method. It is used to tell the
+server that the client did not consume the message.
+
+  $stomper->nack( id => $ack_id );
+
+  $stomper->nack(
+    id      => $ack_id,
+    receipt => 'auto',
+
+    sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        # error handling...
+      }
+
+      # receipt handling...
+    }
+  );
+
+=head2 begin( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+The method C<begin> is used to start a transaction.
+
+=head2 commit( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+The method C<commit> is used to commit a transaction.
+
+=head2 abort([ %params ] [, $cb->( $receipt, $err ) ] )
+
+The method C<abort> is used to roll back a transaction.
+
+=head2 disconnect( [ %params ] [, $cb->( $receipt, $err ) ] )
+
+A client can disconnect from the server at anytime by closing the socket but
+there is no guarantee that the previously sent frames have been received by
+the server. To do a graceful shutdown, where the client is assured that all
+previous frames have been received by the server, you must call C<disconnect>
+method and wait for the C<RECEIPT> frame.
+
+=head2 execute( $command, [ %params ] [, $cb->( $receipt, $err ) ] )
+
+An alternative method to execute commands. In some cases it can be more
+convenient.
+
+  $stomper->execute( 'SEND',
+    destination => '/queue/foo',
+    receipt     => 'auto',
+    body        => 'Hello, world!',
+
+    sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        # error handling...
+
+        return;
+      }
+
+      # receipt handling...
+    }
+  );
 
 =head1 ERROR CODES
 
