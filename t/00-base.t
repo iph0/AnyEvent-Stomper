@@ -2,7 +2,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-use Test::More tests => 38;
+use Test::More tests => 40;
 
 my $t_client_class;
 my $t_cluster_class;
@@ -57,7 +57,9 @@ can_ok( $cluster, 'nack' );
 can_ok( $cluster, 'begin' );
 can_ok( $cluster, 'commit' );
 can_ok( $cluster, 'abort' );
-can_ok( $stomper, 'force_disconnect' );
+can_ok( $cluster, 'force_disconnect' );
+can_ok( $cluster, 'get_node' );
+can_ok( $cluster, 'nodes' );
 
 can_ok( $t_frame_class, 'new' );
 my $frame = new_ok( $t_frame_class => [ 'MESSAGE', { 'message-id' => '123' },

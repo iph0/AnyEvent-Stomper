@@ -89,7 +89,7 @@ sub execute {
   }
 }
 
-sub get {
+sub get_node {
   my $self = shift;
   my $host = shift;
   my $port = shift;
@@ -824,7 +824,7 @@ Full list of error codes see in documentation on L<AnyEvent::Stomper>.
 
 =head1 OTHER METHODS
 
-=head2 get( $host, $port )
+=head2 get_node( $host, $port )
 
 Gets node by host and port.
 
