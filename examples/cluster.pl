@@ -12,8 +12,10 @@ my $cluster = AnyEvent::Stomper::Cluster->new(
     { host => '172.18.0.3', port => 61613 },
     { host => '172.18.0.4', port => 61613 },
   ],
-  login    => 'guest',
-  passcode => 'guest',
+  login              => 'guest',
+  passcode           => 'guest',
+  heartbeat          => [ 5000, 5000 ],
+  connection_timeout => 5,
 
   on_node_connect => sub {
     my $host = shift;
