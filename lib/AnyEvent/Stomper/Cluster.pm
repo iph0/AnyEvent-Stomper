@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.15_03';
+our $VERSION = '0.15_04';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -417,24 +417,27 @@ hash should contain C<host> and C<port> elements.
 
 =item login => $login
 
-The user identifier used to authenticate against a secured STOMP server.
+The user identifier used to authenticate against a secured STOMP server. Must
+be the same for all nodes.
 
 =item passcode => $passcode
 
-The password used to authenticate against a secured STOMP server.
+The password used to authenticate against a secured STOMP server. Must be the
+same for all nodes.
 
 =item vhost => $vhost
 
-The name of a virtual host that the client wishes to connect to.
+The name of a virtual host that the client wishes to connect to. Must be the
+same for all nodes.
 
 =item heartbeat => \@heartbeat
 
 Heart-beating can optionally be used to test the healthiness of the underlying
 TCP connection and to make sure that the remote end is alive and kicking. The
 first number sets interval in milliseconds between outgoing heart-beats to the
-STOMP server. C<0> means, that the client will not send heart-beats. The second
-number sets interval in milliseconds between incoming heart-beats from the
-STOMP server. C<0> means, that the client does not want to receive heart-beats.
+node. C<0> means, that the client will not send heart-beats. The second number
+sets interval in milliseconds between incoming heart-beats from the node. C<0>
+means, that the client does not want to receive heart-beats.
 
   heartbeat => [ 5000, 5000 ],
 
@@ -442,8 +445,8 @@ Not set by default.
 
 =item connection_timeout => $connection_timeout
 
-Specifies connection timeout. If the client could not connect to the server
-after specified timeout, the C<on_error> callback is called with the
+Specifies connection timeout. If the client could not connect to the node
+after specified timeout, the C<on_node_error> callback is called with the
 C<E_CANT_CONN> error. The timeout specifies in seconds and can contain a
 fractional part.
 
@@ -522,15 +525,15 @@ frame. The function must return the decoded body.
 
 =item on_node_connect => $cb->( $host, $port )
 
-The C<on_node_connect> callback is called when the connection to specific node
-is successfully established. To callback are passed two arguments: host and
-port of the node to which the client was connected.
+The C<on_node_connect> callback is called when the connection to particular
+node is successfully established. To callback are passed two arguments: host
+and port of the node to which the client was connected.
 
 Not set by default.
 
 =item on_node_disconnect => $cb->( $host, $port )
 
-The C<on_node_disconnect> callback is called when the connection to specific
+The C<on_node_disconnect> callback is called when the connection to particular
 node is closed by any reason. To callback are passed two arguments: host and
 port of the node from which the client was disconnected.
 
@@ -573,8 +576,38 @@ when the C<RECEIPT> frame will be received. If any error occurred during the
 command execution, the error object is passed to the callback in second
 argument. Error object is the instance of the class L<AnyEvent::Stomper::Error>.
 
-The command callback is optional. If it is not specified and any error
-occurred, the C<on_error> callback of the client is called.
+If you want to track errors on particular nodes for particular command, you
+must specify C<on_node_error> callback in command method.
+
+  $cluster->send(
+    destination => '/queue/foo',
+    body        => 'Hello, world!',
+
+    on_receipt => sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_msg   = $err->message;
+        my $err_code  = $err->code;
+        my $err_frame = $err->frame;
+
+        # error handling...
+
+        return;
+      }
+
+      # receipt handling...
+    },
+
+    on_node_error => sub {
+      my $err  = shift;
+      my $host = shift;
+      my $port = shift;
+
+      # error handling...
+    }
+  );
 
 The full list of all available headers for every command you can find in STOMP
 protocol specification and in documentation on your STOMP server. For various
