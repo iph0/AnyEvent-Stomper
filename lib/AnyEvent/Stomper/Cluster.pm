@@ -584,12 +584,12 @@ versions of STOMP protocol and various STOMP servers they can be differ.
 
 Sends a message to a destination in the messaging system.
 
-  $stomper->send(
+  $cluster->send(
     destination => '/queue/foo',
     body        => 'Hello, world!',
   );
 
-  $stomper->send(
+  $cluster->send(
     destination => '/queue/foo',
     body        => 'Hello, world!',
 
@@ -608,7 +608,7 @@ Sends a message to a destination in the messaging system.
     }
   );
 
-  $stomper->send(
+  $cluster->send(
     destination => '/queue/foo',
     receipt     => 'auto',
     body        => 'Hello, world!',
@@ -640,7 +640,7 @@ to the C<on_message> callback in first argument as the object of the class
 L<AnyEvent::Stomper::Frame>. If the C<subscribe> method is called with one
 callback, this callback will be act as C<on_message> callback.
 
-  $stomper->subscribe(
+  $cluster->subscribe(
     id          => 'foo',
     destination => '/queue/foo',
 
@@ -654,7 +654,7 @@ callback, this callback will be act as C<on_message> callback.
     },
   );
 
-  $stomper->subscribe(
+  $cluster->subscribe(
     id          => 'foo',
     destination => '/queue/foo',
     ack         => 'client',
@@ -688,7 +688,7 @@ callback, this callback will be act as C<on_message> callback.
 
 The method is used to remove an existing subscription.
 
-  $stomper->unsubscribe(
+  $cluster->unsubscribe(
     id          => 'foo',
     destination => '/queue/foo',
 
@@ -715,9 +715,9 @@ using C<client> or C<client-individual> acknowledgment. Any messages received
 from such a subscription will not be considered to have been consumed until the
 message has been acknowledged via an C<ack()> method.
 
-  $stomper->ack( id => $ack_id );
+  $cluster->ack( id => $ack_id );
 
-  $stomper->ack(
+  $cluster->ack(
     id      => $ack_id,
     receipt => 'auto',
 
@@ -742,9 +742,9 @@ message has been acknowledged via an C<ack()> method.
 The C<nack> method is the opposite of C<ack> method. It is used to tell the
 server that the client did not consume the message.
 
-  $stomper->nack( id => $ack_id );
+  $cluster->nack( id => $ack_id );
 
-  $stomper->nack(
+  $cluster->nack(
     id      => $ack_id,
     receipt => 'auto',
 
@@ -789,7 +789,7 @@ method and wait for the C<RECEIPT> frame.
 An alternative method to execute commands. In some cases it can be more
 convenient.
 
-  $stomper->execute( 'SEND',
+  $cluster->execute( 'SEND',
     destination => '/queue/foo',
     receipt     => 'auto',
     body        => 'Hello, world!',
