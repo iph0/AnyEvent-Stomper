@@ -7,10 +7,10 @@ use AnyEvent;
 use AnyEvent::Stomper;
 
 my $stomper = AnyEvent::Stomper->new(
-  host       => 'localhost',
-  port       => '61613',
-  login      => 'guest',
-  passcode   => 'guest',
+  host     => 'localhost',
+  port     => '61613',
+  login    => 'guest',
+  passcode => 'guest',
 
   on_connect => sub {
     print "Connected to server\n";

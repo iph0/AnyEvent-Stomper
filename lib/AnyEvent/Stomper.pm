@@ -136,14 +136,6 @@ sub execute {
   return;
 }
 
-sub force_disconnect {
-  my $self = shift;
-
-  $self->_disconnect();
-
-  return;
-}
-
 # Generate methods
 {
   no strict qw( refs );
@@ -160,6 +152,14 @@ sub force_disconnect {
       return;
     }
   }
+}
+
+sub force_disconnect {
+  my $self = shift;
+
+  $self->_disconnect();
+
+  return;
 }
 
 sub on_error {
@@ -452,7 +452,7 @@ sub _prepare {
       my $err     = shift;
 
       if ( defined $err ) {
-        $self->{on_error}->( $err, $receipt );
+        $self->{on_error}->($err);
         return;
       }
     };
@@ -1059,8 +1059,16 @@ Disabled by default.
 
 =item reconnect_interval => $reconnect_interval
 
-If the parameter is specified, the client will try to reconnect only after
-this interval. Commands executed between performance will be queued.
+If the connection to the server was lost, the client will try to restore the
+connection when you execute next command. By default reconnection is performed
+immediately, on next command execution. If the C<reconnect_interval> parameter
+is specified, the client will try to reconnect only after this interval and
+commands executed between reconnections will be queued.
+
+The client will try to reconnect only once and, if attempt fails, the error
+object is passed to command callback. If you need several attempts of the
+reconnection, you must retry a command from the callback as many times, as you
+need.
 
   reconnect_interval => 5,
 
@@ -1489,14 +1497,14 @@ Gets or sets the C<on_error> callback.
 The method for forced disconnection. All uncompleted operations will be
 aborted.
 
-=head1 CONNECTION POOL
+=head1 WORKING WITH CLUSTER
 
-If you have the cluster or set of STOMP servers, you can use
-L<AnyEvent::Stomper::Pool> to work with them.
+If you have the cluster of STOMP servers, you can use
+L<AnyEvent::Stomper::Cluster> to work with it.
 
 =head1 SEE ALSO
 
-L<AnyEvent::Stomper::Pool>
+L<AnyEvent::Stomper::Cluster>
 
 =head1 AUTHOR
 

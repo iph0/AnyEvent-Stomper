@@ -4,9 +4,9 @@ use strict;
 use warnings;
 
 use AnyEvent;
-use AnyEvent::Stomper::Pool;
+use AnyEvent::Stomper::Cluster;
 
-my $pool = AnyEvent::Stomper::Pool->new(
+my $cluster = AnyEvent::Stomper::Cluster->new(
   nodes => [
     { host => '172.18.0.2', port => 61613 },
     { host => '172.18.0.3', port => 61613 },
@@ -38,12 +38,11 @@ my $pool = AnyEvent::Stomper::Pool->new(
   },
 );
 
-my $stomper = $pool->random;
-my $cv      = AE::cv;
-my $sub_id  = 'foo';
-my $dst     = '/queue/foo';
+my $cv     = AE::cv;
+my $sub_id = 'foo';
+my $dst    = '/queue/foo';
 
-$stomper->subscribe(
+$cluster->subscribe(
   id          => $sub_id,
   destination => $dst,
 
@@ -59,7 +58,7 @@ $stomper->subscribe(
 
     print "Subscribed to $sub_id\n";
 
-    $stomper->send(
+    $cluster->send(
       destination => $dst,
       persistent  => 'true',
       body        => 'Hello, world!',
@@ -80,4 +79,4 @@ $stomper->subscribe(
 
 $cv->recv;
 
-$pool->force_disconnect;
+$cluster->force_disconnect;

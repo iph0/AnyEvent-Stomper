@@ -1,4 +1,4 @@
-package AnyEvent::Stomper::Pool;
+package AnyEvent::Stomper::Cluster;
 
 use 5.008000;
 use strict;
@@ -8,8 +8,20 @@ use base qw( Exporter );
 our $VERSION = '0.15_01';
 
 use AnyEvent::Stomper;
+use AnyEvent::Stomper::Error;
+
 use Scalar::Util qw( weaken );
 use Carp qw( croak );
+
+our %ERROR_CODES;
+
+BEGIN {
+  %ERROR_CODES = %AnyEvent::Stomper::Error::ERROR_CODES;
+  our @EXPORT_OK   = keys %ERROR_CODES;
+  our %EXPORT_TAGS = ( err_codes => \@EXPORT_OK );
+}
+
+use constant \%ERROR_CODES;
 
 
 sub new {
@@ -35,7 +47,8 @@ sub new {
 
   my %node_params;
   foreach my $name ( qw( login passcode vhost heartbeat connection_timeout
-      reconnect_interval handle_params lazy ) )
+      reconnect_interval handle_params lazy default_headers command_headers
+      body_encoder body_decoder ) )
   {
     next unless defined $params{$name};
     $node_params{$name} = $params{$name};
@@ -48,41 +61,51 @@ sub new {
   return $self;
 }
 
+sub execute {
+  my $self     = shift;
+  my $cmd_name = shift;
+
+  my $cmd = $self->_prepare( $cmd_name, [@_] );
+  $self->_execute($cmd);
+
+  return;
+}
+
+# Generate methods
+{
+  no strict qw( refs );
+
+  foreach my $name ( qw( send subscribe unsubscribe ack nack begin commit
+      abort disconnect ) )
+  {
+    *{$name} = sub {
+      my $self = shift;
+
+      my $cmd = $self->_prepare( $name, [@_] );
+      $self->_execute($cmd);
+
+      return;
+    }
+  }
+}
+
 sub get {
   my $self = shift;
   my $host = shift;
   my $port = shift;
 
-  return $self->{_nodes_idx}{"$host:$port"};
+  return $self->{_nodes_pool}{"$host:$port"};
 }
 
 sub nodes {
   my $self = shift;
-  return @{ $self->{_nodes_list} };
-}
-
-sub random {
-  my $self = shift;
-
-  my $rand_index = int( rand( $self->{_pool_size} ) );
-
-  return $self->{_nodes_list}[$rand_index];
-}
-
-sub next {
-  my $self = shift;
-
-  unless ( $self->{_node_index} < $self->{_pool_size} ) {
-    $self->{_node_index} = 0;
-  }
-
-  return $self->{_nodes_list}[ $self->{_node_index}++ ];
+  return values %{ $self->{_nodes_pool} };
 }
 
 sub force_disconnect {
   my $self = shift;
 
-  foreach my $node ( @{ $self->{_nodes_list} } ) {
+  foreach my $node ( values %{ $self->{_nodes_pool} } ) {
     $node->force_disconnect;
   }
   $self->_reset_internals;
@@ -93,21 +116,19 @@ sub force_disconnect {
 sub _init {
   my $self = shift;
 
-  my $nodes_idx  = $self->{_nodes_idx};
-  my $nodes_list = $self->{_nodes_list};
+  my $nodes_pool = $self->{_nodes_pool};
 
   foreach my $node_params ( @{ $self->{nodes} } ) {
     my $hostport = "$node_params->{host}:$node_params->{port}";
 
-    unless ( defined $nodes_idx->{$hostport} ) {
-      my $node
+    unless ( defined $nodes_pool->{$hostport} ) {
+      $nodes_pool->{$hostport}
           = $self->_new_node( $node_params->{host}, $node_params->{port} );
-      $nodes_idx->{$hostport} = $node;
-      push( @{$nodes_list}, $node );
     }
   }
 
-  $self->{_pool_size} = scalar @{$nodes_list};
+  $self->{_nodes}       = [ keys %{ $self->{_nodes_pool} } ];
+  $self->{_active_node} = $self->_next_node;
 
   return;
 }
@@ -121,6 +142,7 @@ sub _new_node {
     %{ $self->{_node_params} },
     host          => $host,
     port          => $port,
+    lazy          => 1,
     on_connect    => $self->_create_on_node_connect( $host, $port ),
     on_disconnect => $self->_create_on_node_disconnect( $host, $port ),
     on_error      => $self->_create_on_node_error( $host, $port ),
@@ -165,19 +187,130 @@ sub _create_on_node_error {
   return sub {
     my $err = shift;
 
+    my $err_code = $err->code;
+
+    if ( $err_code != E_OPRN_ERROR
+      && $err_code != E_CONN_CLOSED_BY_CLIENT )
+    {
+      $self->{_active_node} = $self->_next_node;
+    }
+
     if ( defined $self->{on_node_error} ) {
       $self->{on_node_error}->( $err, $host, $port );
     }
   };
 }
 
+sub _prepare {
+  my $self     = shift;
+  my $cmd_name = uc(shift);
+  my $args     = shift;
+
+  my %cbs;
+  if ( ref( $args->[-1] ) eq 'CODE'
+    && scalar @{$args} % 2 > 0 )
+  {
+    if ( $cmd_name eq 'SUBSCRIBE' ) {
+      $cbs{on_message} = pop @{$args};
+    }
+    else {
+      $cbs{on_receipt} = pop @{$args};
+    }
+  }
+
+  my %headers = @{$args};
+  foreach my $name ( qw( on_receipt on_message on_node_error ) ) {
+    if ( defined $headers{$name} ) {
+      $cbs{$name} = delete $headers{$name};
+    }
+  }
+  my $body = delete $headers{body};
+
+  my $cmd = {
+    name    => $cmd_name,
+    headers => \%headers,
+    body    => $body,
+    %cbs,
+  };
+
+  return $cmd;
+}
+
+sub _execute {
+  my $self      = shift;
+  my $cmd       = shift;
+  my $fails_cnt = shift || 0;
+
+  my $hostport = $self->{_active_node};
+  my $node     = $self->{_nodes_pool}{$hostport};
+
+  weaken($self);
+
+  $node->execute( $cmd->{name}, %{ $cmd->{headers} },
+    body => $cmd->{body},
+
+    on_receipt => sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        my $err_code = $err->code;
+        $fails_cnt++;
+
+        my $on_node_error = $cmd->{on_node_error} || $self->{on_node_error};
+        if ( defined $on_node_error ) {
+          my $node = $self->{_nodes_pool}{$hostport};
+          $on_node_error->( $err, $node->host, $node->port );
+        }
+
+        if ( $err_code != E_OPRN_ERROR
+          && $err_code != E_CONN_CLOSED_BY_CLIENT
+          && $fails_cnt < scalar @{ $self->{_nodes} } )
+        {
+          $self->_execute( $cmd, $fails_cnt );
+          return;
+        }
+
+        if ( defined $cmd->{on_receipt} ) {
+          $cmd->{on_receipt}->( $receipt, $err );
+        }
+
+        return;
+      }
+
+      if ( defined $cmd->{on_receipt} ) {
+        $cmd->{on_receipt}->($receipt);
+      }
+    },
+
+    defined $cmd->{on_message}
+    ? ( on_message => $cmd->{on_message} )
+    : (),
+  );
+
+  return;
+}
+
+sub _next_node {
+  my $self = shift;
+
+  unless ( defined $self->{_node_index} ) {
+    $self->{_node_index} = int( rand( scalar @{ $self->{_nodes} } ) );
+  }
+  elsif ( $self->{_node_index} == scalar @{ $self->{_nodes} } ) {
+    $self->{_node_index} = 0;
+  }
+
+  return $self->{_nodes}[ $self->{_node_index}++ ];
+}
+
 sub _reset_internals {
   my $self = shift;
 
-  $self->{_nodes_idx}  = {};
-  $self->{_nodes_list} = [];
-  $self->{_pool_size}  = 0;
-  $self->{_node_index} = 0;
+  $self->{_nodes_pool}  = {};
+  $self->{_nodes}       = undef;
+  $self->{_node_index}  = undef;
+  $self->{_active_node} = undef;
 
   return;
 }
@@ -187,14 +320,14 @@ __END__
 
 =head1 NAME
 
-AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
+AnyEvent::Stomper::Cluster - The client for the cluster of STOMP servers
 
 =head1 SYNOPSIS
 
   use AnyEvent;
-  use AnyEvent::Stomper::Pool;
+  use AnyEvent::Stomper::Cluster;
 
-  my $pool = AnyEvent::Stomper::Pool->new(
+  my $cluster = AnyEvent::Stomper::Cluster->new(
     nodes => [
       { host => 'stomp-server-1.com', port => 61613 },
       { host => 'stomp-server-2.com', port => 61613 },
@@ -204,10 +337,9 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
     passcode => 'guest',
   );
 
-  my $stomper = $pool->random;
-  my $cv      = AE::cv;
+  my $cv = AE::cv;
 
-  $stomper->subscribe(
+  $cluster->subscribe(
     id          => 'foo',
     destination => '/queue/foo',
 
@@ -221,7 +353,7 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
           return;
         }
 
-        $stomper->send(
+        $cluster->send(
           destination => '/queue/foo',
           body        => 'Hello, world!',
         );
@@ -242,14 +374,13 @@ AnyEvent::Stomper::Pool - Connection pool for AnyEvent::Stomper
 
 =head1 DESCRIPTION
 
-AnyEvent::Stomper::Pool is connection pool for AnyEvent::Stomper. This module
-can be used to work with cluster or set of STOMP servers.
+AnyEvent::Stomper::Cluster is the client for the cluster of STOMP servers.
 
 =head1 CONSTRUCTOR
 
 =head2 new( %params )
 
-  my $stomper = AnyEvent::Stomper::Pool->new(
+  my $cluster = AnyEvent::Stomper::Cluster->new(
     nodes => [
       { host => 'stomp-server-1.com', port => 61613 },
       { host => 'stomp-server-2.com', port => 61613 },
@@ -278,77 +409,15 @@ can be used to work with cluster or set of STOMP servers.
     },
   );
 
+AnyEvent::Stomper::Cluster has same constructor parameters as
+L<AnyEvent::Stomper>, and few more parameters listed below.
+
 =over
 
 =item nodes => \@nodes
 
 Specifies the list of nodes. Parameter should contain array of hashes. Each
 hash should contain C<host> and C<port> elements.
-
-=item login => $login
-
-The user identifier used to authenticate against a secured STOMP server.
-
-=item passcode => $passcode
-
-The password used to authenticate against a secured STOMP server.
-
-=item vhost => $vhost
-
-The name of a virtual host that the client wishes to connect to.
-
-=item heartbeat => \@heartbeat
-
-Heart-beating can optionally be used to test the healthiness of the underlying
-TCP connection and to make sure that the remote end is alive and kicking. The
-first number sets interval in milliseconds between outgoing heart-beats to the
-STOMP server. C<0> means, that the client will not send heart-beats. The second
-number sets interval in milliseconds between incoming heart-beats from the
-STOMP server. C<0> means, that the client does not want to receive heart-beats.
-
-  heartbeat => [ 5000, 5000 ],
-
-Not set by default.
-
-=item connection_timeout => $connection_timeout
-
-Specifies connection timeout. If the client could not connect to the node
-after specified timeout, the C<on_node_error> callback is called with the
-C<E_CANT_CONN> error. The timeout specifies in seconds and can contain a
-fractional part.
-
-  connection_timeout => 10.5,
-
-By default the client use kernel's connection timeout.
-
-=item lazy => $boolean
-
-If enabled, the connection establishes at time when you will send the first
-command to the node. By default the connection establishes after calling of
-the C<new> method.
-
-Disabled by default.
-
-=item reconnect_interval => $reconnect_interval
-
-If the parameter is specified, the client will try to reconnect only after
-this interval. Commands executed between reconnections will be queued.
-
-  reconnect_interval => 5,
-
-Not set by default.
-
-=item handle_params => \%params
-
-Specifies L<AnyEvent::Handle> parameters.
-
-  handle_params => {
-    autocork => 1,
-    linger   => 60,
-  }
-
-Enabling of the C<autocork> parameter can improve perfomance. See
-documentation on L<AnyEvent::Handle> for more information.
 
 =item on_node_connect => $cb->( $host, $port )
 
@@ -378,23 +447,29 @@ Not set by default.
 
 =back
 
-=head1 METHODS
+=head1 COMMAND METHODS
+
+See documentation on L<AnyEvent::Stomper> to learn how execute STOMP commands.
+
+=head1 ERROR CODES
+
+Every error object, passed to callback, contain error code, which can be used
+for programmatic handling of errors. AnyEvent::Stomper::Cluster provides
+constants for error codes. They can be imported and used in expressions.
+
+  use AnyEvent::Stomper::Cluster qw( :err_codes );
+
+Full list of error codes see in documentation on L<AnyEvent::Stomper>.
+
+=head1 OTHER METHODS
 
 =head2 get( $host, $port )
 
-Gets specified node.
+Gets node by host and port.
 
 =head2 nodes()
 
 Gets all available nodes.
-
-=head2 random()
-
-Gets random node.
-
-=head2 next()
-
-Gets next node from nodes list cyclically.
 
 =head2 force_disconnect()
 
