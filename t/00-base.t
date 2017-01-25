@@ -2,7 +2,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-use Test::More tests => 40;
+use Test::More tests => 46;
 
 my $t_client_class;
 my $t_cluster_class;
@@ -60,6 +60,16 @@ can_ok( $cluster, 'abort' );
 can_ok( $cluster, 'force_disconnect' );
 can_ok( $cluster, 'get_node' );
 can_ok( $cluster, 'nodes' );
+
+my $node = $cluster->get_node( '172.18.0.3', 61613 );
+is( $node->host, '172.18.0.3', 'cluster; get node; check host' );
+is( $node->port, 61613, 'cluster; get node; check port' );
+
+my @nodes = $cluster->nodes;
+is ( scalar @nodes, 3, 'cluster; get all nodes; number' );
+foreach my $node ( @nodes ) {
+  isa_ok( $node, 'AnyEvent::Stomper' );
+}
 
 can_ok( $t_frame_class, 'new' );
 my $frame = new_ok( $t_frame_class => [ 'MESSAGE', { 'message-id' => '123' },
