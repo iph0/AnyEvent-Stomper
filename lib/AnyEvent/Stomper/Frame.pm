@@ -4,7 +4,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-our $VERSION = '0.16';
+our $VERSION = '0.18';
 
 use Encode qw( decode );
 
@@ -68,10 +68,6 @@ Gets frame headers
 =head2 body( [ $body ] )
 
 Gets frame body
-
-=head2 decoded_body()
-
-Gets decoded frame body.
 
 =head1 SEE ALSO
 

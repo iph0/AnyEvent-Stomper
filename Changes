@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.18 Thu Jan 26 17:46:15 MSK 2017
+  - Fix in POD.
+
 0.16 Thu Jan 26 17:19:05 MSK 2017
   - The logic of working with cluster completely rewritten. Added
     AnyEvent::Stomper::Cluster instead AnyEvent::Stomper::Pool.
