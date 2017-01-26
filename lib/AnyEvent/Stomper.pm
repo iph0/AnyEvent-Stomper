@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.22';
+our $VERSION = '0.24';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -934,7 +934,7 @@ AnyEvent::Stomper - Flexible non-blocking STOMP client
       print "Consumed: $body\n";
 
       $cv->send;
-    }
+    },
   );
 
   $cv->recv;
@@ -1242,7 +1242,7 @@ callback, this callback will be act as C<on_message> callback.
       my $body    = $msg->body;
 
       # message handling...
-    }
+    },
   );
 
 =head2 unsubscribe( [ %params ] [, $cb->( $receipt, $err ) ] )

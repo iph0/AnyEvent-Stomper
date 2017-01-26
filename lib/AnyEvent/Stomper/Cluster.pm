@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.22';
+our $VERSION = '0.24';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -373,31 +373,30 @@ AnyEvent::Stomper::Cluster - The client for the cluster of STOMP servers
     id          => 'foo',
     destination => '/queue/foo',
 
-    { on_receipt => sub {
-        my $err = $_[1];
+    on_receipt => sub {
+      my $err = $_[1];
 
-        if ( defined $err ) {
-          warn $err->message . "\n";
-          $cv->send;
-
-          return;
-        }
-
-        $cluster->send(
-          destination => '/queue/foo',
-          body        => 'Hello, world!',
-        );
-      },
-
-      on_message => sub {
-        my $msg = shift;
-
-        my $body = $msg->body;
-        print "Consumed: $body\n";
-
+      if ( defined $err ) {
+        warn $err->message . "\n";
         $cv->send;
-      },
-    }
+
+        return;
+      }
+
+      $cluster->send(
+        destination => '/queue/foo',
+        body        => 'Hello, world!',
+      );
+    },
+
+    on_message => sub {
+      my $msg = shift;
+
+      my $body = $msg->body;
+      print "Consumed: $body\n";
+
+      $cv->send;
+    },
   );
 
   $cv->recv;
@@ -750,7 +749,7 @@ callback, this callback will be act as C<on_message> callback.
       my $body    = $msg->body;
 
       # message handling...
-    }
+    },
   );
 
 =head2 unsubscribe( [ %params ] [, $cb->( $receipt, $err ) ] )
