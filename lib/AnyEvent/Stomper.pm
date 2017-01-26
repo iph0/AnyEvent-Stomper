@@ -1119,7 +1119,7 @@ way to specify the command callback.
 
 If you want to receive C<RECEIPT> frame, you must specify C<receipt> header.
 The C<receipt> header can take the special value C<auto>. If it set, the
-receipt identificator will be generated automatically by the client. The
+receipt identifier will be generated automatically by the client. The
 C<RECEIPT> frame is passed to the command callback in first argument as the
 object of the class L<AnyEvent::Stomper::Frame>. If the C<receipt> header is
 not specified the first argument of the command callback will be C<undef>.
@@ -1128,10 +1128,11 @@ For commands C<SUBSCRIBE>, C<UNSUBSCRIBE>, C<DISCONNECT> the client
 automatically adds C<receipt> header for internal usage.
 
 The command callback is called in one of two cases depending on the presence of
-the C<receipt> header: when the command was successfully sent to the server or
-when the C<RECEIPT> frame will be received. If any error occurred during the
-command execution, the error object is passed to the callback in second
-argument. Error object is the instance of the class L<AnyEvent::Stomper::Error>.
+the C<receipt> header. First case, when the command was successfully sent to
+the server. Second case, when the C<RECEIPT> frame will be received. If any
+error occurred during the command execution, the error object is passed to the
+callback in second argument. Error object is the instance of the class
+L<AnyEvent::Stomper::Error>.
 
 The command callback is optional. If it is not specified and any error
 occurred, the C<on_error> callback of the client is called.
