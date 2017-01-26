@@ -4,7 +4,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-our $VERSION = '0.20';
+our $VERSION = '0.22';
 
 use Encode qw( decode );
 
@@ -51,7 +51,7 @@ to callbacks.
 
 =head1 CONSTRUCTOR
 
-=head2 new( $command, \%headers, $body )
+=head2 new( $command, \%headers [, $body ] )
 
 Creates error object.
 

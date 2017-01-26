@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.22 Thu Jan 26 18:29:17 MSK 2017
+  - Fixes in POD.
+
 0.20 Thu Jan 26 18:04:42 MSK 2017
   - Fixed call templates of several methods in POD.
 

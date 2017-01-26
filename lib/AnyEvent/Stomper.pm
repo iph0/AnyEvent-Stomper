@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.20';
+our $VERSION = '0.22';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -1333,7 +1333,7 @@ The method C<begin> is used to start a transaction.
 
 The method C<commit> is used to commit a transaction.
 
-=head2 abort([ %params ] [, $cb->( $receipt, $err ) ] )
+=head2 abort( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The method C<abort> is used to roll back a transaction.
 
