@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.15_07';
+our $VERSION = '0.16';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -424,20 +424,30 @@ AnyEvent::Stomper::Cluster is the client for the cluster of STOMP servers.
     reconnect_interval => 5,
 
     on_node_connect => sub {
+      my $host = shift;
+      my $port = shift;
+
       # handling...
     },
 
     on_node_disconnect => sub {
+      my $host = shift;
+      my $port = shift;
+
       # handling...
     },
 
     on_node_error => sub {
       my $err = shift;
+      my $host = shift;
+      my $port = shift;
 
       # error handling...
     },
 
     on_error => sub {
+      my $err = shift;
+
       # error handling...
     },
   );
@@ -837,7 +847,7 @@ The method C<abort> is used to roll back a transaction.
 
 =head2 disconnect( [ %params ] [, $cb->( $receipt, $err ) ] )
 
-A client can disconnect from the сurrent active node at anytime by closing the
+A client can disconnect from the current active node at anytime by closing the
 socket but there is no guarantee that the previously sent frames have been
 received by the node. To do a graceful shutdown, where the client is assured
 that all previous frames have been received by the node, you must call
@@ -912,7 +922,7 @@ Sponsored by SMS Online, E<lt>dev.opensource@sms-online.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2016, Eugene Ponizovsky, SMS Online. All rights reserved.
+Copyright (c) 2016-2017, Eugene Ponizovsky, SMS Online. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
