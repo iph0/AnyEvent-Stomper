@@ -90,17 +90,6 @@ sub execute {
   }
 }
 
-sub force_disconnect {
-  my $self = shift;
-
-  foreach my $node ( values %{ $self->{_nodes_pool} } ) {
-    $node->force_disconnect;
-  }
-  $self->_reset_internals;
-
-  return;
-}
-
 sub get_node {
   my $self = shift;
   my $host = shift;
@@ -132,6 +121,17 @@ sub on_error {
   }
 
   return $self->{on_error};
+}
+
+sub force_disconnect {
+  my $self = shift;
+
+  foreach my $node ( values %{ $self->{_nodes_pool} } ) {
+    $node->force_disconnect;
+  }
+  $self->_reset_internals;
+
+  return;
 }
 
 sub _init {
@@ -897,6 +897,10 @@ Gets node by host and port.
 =head2 nodes()
 
 Gets all available nodes.
+
+=head2 on_error( [ $callback ] )
+
+Gets or sets the C<on_error> callback.
 
 =head2 force_disconnect()
 

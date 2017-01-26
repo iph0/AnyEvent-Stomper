@@ -152,14 +152,6 @@ sub execute {
   }
 }
 
-sub force_disconnect {
-  my $self = shift;
-
-  $self->_disconnect();
-
-  return;
-}
-
 sub on_error {
   my $self = shift;
 
@@ -221,6 +213,14 @@ sub on_error {
       return $self->{$name};
     };
   }
+}
+
+sub force_disconnect {
+  my $self = shift;
+
+  $self->_disconnect();
+
+  return;
 }
 
 sub _connect {
