@@ -4,7 +4,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = '0.20;
 
 use Encode qw( decode );
 
@@ -57,15 +57,15 @@ Creates error object.
 
 =head1 METHODS
 
-=head2 command( [ $command ] )
+=head2 command()
 
 Gets command name
 
-=head2 headers( [ $headers ] )
+=head2 headers()
 
 Gets frame headers
 
-=head2 body( [ $body ] )
+=head2 body()
 
 Gets frame body
 
