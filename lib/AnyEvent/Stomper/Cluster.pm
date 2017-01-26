@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.15_06';
+our $VERSION = '0.15_07';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -48,8 +48,7 @@ sub new {
 
   my %node_params;
   foreach my $name ( qw( login passcode vhost heartbeat connection_timeout
-      reconnect_interval handle_params default_headers command_headers
-      body_encoder body_decoder ) )
+      reconnect_interval handle_params default_headers command_headers ) )
   {
     next unless defined $params{$name};
     $node_params{$name} = $params{$name};
@@ -534,26 +533,6 @@ Specifies default headers for particular commands.
       durable => 'true',
       ack     => 'client',
     },
-  }
-
-=item body_encoder => $cb->( $body [, $content_type ] )
-
-Specifies the encode function for the body of the frame. The function accepts
-two arguments: the body and the content type of the body if it specified in the
-frame. The function must return the encoded body.
-
-  body_encoder => sub {
-    return encode_json( $_[0] );
-  }
-
-=item body_decoder => $cb->( $body [, $content_type ] )
-
-Specifies the decode function for the body of the frame. The function accepts
-two arguments: the body and the content type of the body if it specified in the
-frame. The function must return the decoded body.
-
-  body_decoder => sub {
-    return decode_json( $_[0] );
   }
 
 =item on_node_connect => $cb->( $host, $port )
