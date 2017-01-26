@@ -44,6 +44,7 @@ sub new {
   $self->{on_node_connect}    = $params{on_node_connect};
   $self->{on_node_disconnect} = $params{on_node_disconnect};
   $self->{on_node_error}      = $params{on_node_error};
+  $self->on_error( $params{on_error} );
 
   my %node_params;
   foreach my $name ( qw( login passcode vhost heartbeat connection_timeout
@@ -89,6 +90,17 @@ sub execute {
   }
 }
 
+sub force_disconnect {
+  my $self = shift;
+
+  foreach my $node ( values %{ $self->{_nodes_pool} } ) {
+    $node->force_disconnect;
+  }
+  $self->_reset_internals;
+
+  return;
+}
+
 sub get_node {
   my $self = shift;
   my $host = shift;
@@ -102,15 +114,24 @@ sub nodes {
   return values %{ $self->{_nodes_pool} };
 }
 
-sub force_disconnect {
+sub on_error {
   my $self = shift;
 
-  foreach my $node ( values %{ $self->{_nodes_pool} } ) {
-    $node->force_disconnect;
-  }
-  $self->_reset_internals;
+  if (@_) {
+    my $on_error = shift;
 
-  return;
+    if ( defined $on_error ) {
+      $self->{on_error} = $on_error;
+    }
+    else {
+      $self->{on_error} = sub {
+        my $err = shift;
+        warn $err->message . "\n";
+      };
+    }
+  }
+
+  return $self->{on_error};
 }
 
 sub _init {
@@ -233,6 +254,20 @@ sub _prepare {
     %cbs,
   };
 
+  unless ( defined $cmd->{on_receipt} ) {
+    weaken($self);
+
+    $cmd->{on_receipt} = sub {
+      my $receipt = shift;
+      my $err     = shift;
+
+      if ( defined $err ) {
+        $self->{on_error}->($err);
+        return;
+      }
+    };
+  }
+
   return $cmd;
 }
 
@@ -271,16 +306,12 @@ sub _execute {
           return;
         }
 
-        if ( defined $cmd->{on_receipt} ) {
-          $cmd->{on_receipt}->( $receipt, $err );
-        }
+        $cmd->{on_receipt}->( $receipt, $err );
 
         return;
       }
 
-      if ( defined $cmd->{on_receipt} ) {
-        $cmd->{on_receipt}->($receipt);
-      }
+      $cmd->{on_receipt}->($receipt);
     },
 
     defined $cmd->{on_message}
