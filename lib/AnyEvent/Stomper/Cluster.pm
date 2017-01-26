@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.15_05';
+our $VERSION = '0.15_06';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -76,7 +76,7 @@ sub execute {
   no strict qw( refs );
 
   foreach my $name ( qw( send subscribe unsubscribe ack nack begin commit
-      abort ) )
+      abort disconnect ) )
   {
     *{$name} = sub {
       my $self = shift;
@@ -413,7 +413,9 @@ AnyEvent::Stomper::Cluster is the client for the cluster of STOMP servers.
 =item nodes => \@nodes
 
 Specifies the list of nodes. Parameter should contain array of hashes. Each
-hash should contain C<host> and C<port> elements.
+hash should contain C<host> and C<port> elements. The client gets one random
+node from this list, connects to it and sends all frames to this node. If
+current active node fails, the client gets next node from the list.
 
 =item login => $login
 
@@ -811,11 +813,11 @@ The method C<abort> is used to roll back a transaction.
 
 =head2 disconnect( [ %params ] [, $cb->( $receipt, $err ) ] )
 
-A client can disconnect from the server at anytime by closing the socket but
-there is no guarantee that the previously sent frames have been received by
-the server. To do a graceful shutdown, where the client is assured that all
-previous frames have been received by the server, you must call C<disconnect>
-method and wait for the C<RECEIPT> frame.
+A client can disconnect from the сurrent active node at anytime by closing the
+socket but there is no guarantee that the previously sent frames have been
+received by the node. To do a graceful shutdown, where the client is assured
+that all previous frames have been received by the node, you must call
+C<disconnect> method and wait for the C<RECEIPT> frame.
 
 =head2 execute( $command, [ %params ] [, $cb->( $receipt, $err ) ] )
 

@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.15_05';
+our $VERSION = '0.15_06';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -75,8 +75,6 @@ sub new {
   $self->{lazy}            = $params{lazy};
   $self->{handle_params}   = $params{handle_params} || {};
   $self->{default_headers} = $params{default_headers} || {};
-  $self->{body_encoder}    = $params{body_encoder};
-  $self->{body_decoder}    = $params{body_decoder};
   $self->{on_connect}      = $params{on_connect};
   $self->{on_disconnect}   = $params{on_disconnect};
 
@@ -363,18 +361,6 @@ sub _create_on_read {
         }
 
         my $body = substr( $handle->{rbuf}, 0, $content_length, '' );
-        if ( defined $self->{body_decoder}
-          && length($body) > 0 )
-        {
-          $body = $self->{body_decoder}->(
-            $body,
-
-            defined $headers->{'content-type'}
-            ? $headers->{'content-type'}
-            : ()
-          );
-        }
-
         $handle->{rbuf} =~ s/^\0(?:${\(RE_EOL)})*//;
 
         $frame = _new_frame( $cmd_name, $headers, $body );
@@ -388,7 +374,6 @@ sub _create_on_read {
         return unless $handle->{rbuf} =~ s/^(.+?)(?:${\(RE_EOL)}){2}//s;
 
         ( $cmd_name, my @header_strings ) = split( m/${\(RE_EOL)}/, $1 );
-
         foreach my $header_str (@header_strings) {
           my ( $name, $value ) = split( /:/, $header_str, 2 );
           $headers->{ _unescape($name) } = _unescape($value);
@@ -542,17 +527,6 @@ sub _push_write {
   my $body = $cmd->{body};
   unless ( defined $body ) {
     $body = '';
-  }
-  if ( defined $self->{body_encoder}
-    && length($body) > 0 )
-  {
-    $body = $self->{body_encoder}->(
-      $body,
-
-      defined $headers->{'content-type'}
-      ? $headers->{'content-type'}
-      : ()
-    );
   }
   unless ( defined $headers->{'content-length'} ) {
     $headers->{'content-length'} = length($body);
@@ -1108,26 +1082,6 @@ Specifies default headers for particular commands.
       durable => 'true',
       ack     => 'client',
     },
-  }
-
-=item body_encoder => $cb->( $body [, $content_type ] )
-
-Specifies the encode function for the body of the frame. The function accepts
-two arguments: the body and the content type of the body if it specified in the
-frame. The function must return the encoded body.
-
-  body_encoder => sub {
-    return encode_json( $_[0] );
-  }
-
-=item body_decoder => $cb->( $body [, $content_type ] )
-
-Specifies the decode function for the body of the frame. The function accepts
-two arguments: the body and the content type of the body if it specified in the
-frame. The function must return the decoded body.
-
-  body_decoder => sub {
-    return decode_json( $_[0] );
   }
 
 =item on_connect => $cb->()
