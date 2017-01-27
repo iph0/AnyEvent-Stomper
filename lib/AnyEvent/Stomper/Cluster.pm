@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.24';
+our $VERSION = '0.25_01';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -89,14 +89,6 @@ sub execute {
   }
 }
 
-sub get_node {
-  my $self = shift;
-  my $host = shift;
-  my $port = shift;
-
-  return $self->{_nodes_pool}{"$host:$port"};
-}
-
 sub nodes {
   my $self = shift;
   return values %{ $self->{_nodes_pool} };
@@ -125,7 +117,7 @@ sub on_error {
 sub force_disconnect {
   my $self = shift;
 
-  foreach my $node ( values %{ $self->{_nodes_pool} } ) {
+  foreach my $node ( $self->nodes ) {
     $node->force_disconnect;
   }
   $self->_reset_internals;
@@ -891,10 +883,6 @@ constants for error codes. They can be imported and used in expressions.
 Full list of error codes see in documentation on L<AnyEvent::Stomper>.
 
 =head1 OTHER METHODS
-
-=head2 get_node( $host, $port )
-
-Gets node by host and port.
 
 =head2 nodes()
 
