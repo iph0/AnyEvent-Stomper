@@ -1,5 +1,9 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.26 Sat Jan 28 16:39:10 MSK 2017
+  - Removed useless method "get_node".
+  - Light refactoring.
+
 0.24 Thu Jan 26 23:01:07 MSK 2017
   - Fixed synopsis in POD for AnyEvent::Stomper::Cluster.
 
