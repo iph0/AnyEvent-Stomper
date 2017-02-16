@@ -1,7 +1,7 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
 0.30 Thu Feb 16 12:48:26 MSK 2017
-  - Minor fixes.
+  - Fix in Changes file.
 
 0.28 Thu Feb 16 12:30:15 MSK 2017
   - Added README.pod file instead of README file.
