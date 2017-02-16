@@ -89,7 +89,7 @@ Sponsored by SMS Online, E<lt>dev.opensource@sms-online.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2016, Eugene Ponizovsky, SMS Online. All rights reserved.
+Copyright (c) 2016-2017, Eugene Ponizovsky, SMS Online. All rights reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
