@@ -54,7 +54,7 @@ $stomper->subscribe(
     print "Consumed: $body\n";
 
     $stomper->ack(
-      id      => $headers->{ack},
+      message => $msg,
       receipt => 'auto',
 
       sub {
@@ -66,7 +66,7 @@ $stomper->subscribe(
           return;
         }
 
-        print "Acked: $headers->{ack}\n";
+        print "Acked: $headers->{'message-id'}\n";
       }
     );
   }

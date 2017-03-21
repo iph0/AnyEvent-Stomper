@@ -7,9 +7,11 @@ WriteMakefile(
   VERSION_FROM     => 'lib/AnyEvent/Stomper.pm',
   MIN_PERL_VERSION => '5.008000',
   PREREQ_PM        => {
-    'AnyEvent'            => '6.01',
-    'Scalar::Util'        => '0',
-    'Carp'                => '0',
+    'AnyEvent'        => '6.01',
+    'Scalar::Util'    => '0',
+    'List::MoreUtils' => '0.416',
+    'Carp'            => '0',
+    version           => '0.77',
   },
   CONFIGURE_REQUIRES => {
     'ExtUtils::MakeMaker' => '6.64',

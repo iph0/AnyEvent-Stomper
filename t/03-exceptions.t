@@ -2,7 +2,7 @@ use 5.008000;
 use strict;
 use warnings;
 
-use Test::More tests => 14;
+use Test::More tests => 15;
 use Test::Fatal;
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Cluster;
@@ -11,6 +11,7 @@ t_heartbeat();
 t_conn_timeout();
 t_reconnect_interval();
 t_on_message();
+t_ack_message();
 t_nodes();
 
 sub t_heartbeat {
@@ -131,6 +132,20 @@ sub t_on_message {
     },
     qr/"on_message" callback must be specified/,
     "\"on_message\" callback not specified",
+  );
+
+  return;
+}
+
+sub t_ack_message {
+  my $stomper = AnyEvent::Stomper->new();
+
+  like(
+    exception {
+      $stomper->ack;
+    },
+    qr/"message" parameter must be specified/,
+    "\"message\" parameter not specified",
   );
 
   return;

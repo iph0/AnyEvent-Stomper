@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.30';
+our $VERSION = '0.31_01';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -14,9 +14,10 @@ use AnyEvent;
 use AnyEvent::Handle;
 use Scalar::Util qw( looks_like_number weaken );
 use List::Util qw( max );
+use List::MoreUtils qw( bsearch_index );
 use Carp qw( croak );
 
-our %ERROR_CODES;
+my %ERROR_CODES;
 
 BEGIN {
   %ERROR_CODES = %AnyEvent::Stomper::Error::ERROR_CODES;
@@ -46,6 +47,11 @@ my %SUBUNSUB_CMDS = (
   UNSUBSCRIBE => 1,
 );
 
+my %ACK_CMDS = (
+  ACK  => 1,
+  NACK => 1,
+);
+
 my %NEED_RECEIPT = (
   CONNECT    => 1,
   DISCONNECT => 1,
@@ -59,6 +65,9 @@ my %ESCAPE_MAP = (
   "\\" => "\\\\",
 );
 my %UNESCAPE_MAP = reverse %ESCAPE_MAP;
+
+my $RECEIPT_SEQ = 1;
+my $MESSAGE_SEQ = 1;
 
 
 sub new {
@@ -392,25 +401,29 @@ sub _prepare {
   my $cmd_name = uc(shift);
   my $args     = shift;
 
-  my %cbs;
+  my %params;
+
   if ( ref( $args->[-1] ) eq 'CODE'
     && scalar @{$args} % 2 > 0 )
   {
     if ( $cmd_name eq 'SUBSCRIBE' ) {
-      $cbs{on_message} = pop @{$args};
+      $params{on_message} = pop @{$args};
     }
     else {
-      $cbs{on_receipt} = pop @{$args};
+      $params{on_receipt} = pop @{$args};
     }
   }
 
   my %headers = @{$args};
-  foreach my $name ( qw( on_receipt on_message ) ) {
+
+  foreach my $name ( qw( body on_receipt on_message ) ) {
     if ( defined $headers{$name} ) {
-      $cbs{$name} = delete $headers{$name};
+      $params{$name} = delete $headers{$name};
     }
   }
-  my $body = delete $headers{body};
+  if ( exists $ACK_CMDS{$cmd_name} ) {
+    $params{message} = delete $headers{message};
+  }
 
   %headers = (
     %{ $self->{default_headers} },
@@ -425,8 +438,7 @@ sub _prepare {
   my $cmd = {
     name    => $cmd_name,
     headers => \%headers,
-    body    => $body,
-    %cbs,
+    %params,
   };
 
   unless ( defined $cmd->{on_receipt} ) {
@@ -454,6 +466,11 @@ sub _execute {
     && !defined $cmd->{on_message} )
   {
     croak '"on_message" callback must be specified';
+  }
+  elsif ( exists $ACK_CMDS{ $cmd->{name} }
+    && !defined $cmd->{message} )
+  {
+    croak '"message" parameter must be specified';
   }
 
   unless ( $self->{_ready} ) {
@@ -503,24 +520,45 @@ sub _push_write {
   my $self = shift;
   my $cmd  = shift;
 
-  my $headers = $cmd->{headers};
+  my $cmd_headers = $cmd->{headers};
+
+  if ( exists $ACK_CMDS{ $cmd->{name} } ) {
+    unless ( $self->_check_ack( $cmd->{message} ) ) {
+      my $err = _new_error( "Unexpected $cmd->{name} sent.", E_OPRN_ERROR );
+      AE::postpone { $cmd->{on_receipt}->( undef, $err ) };
+
+      return;
+    }
+
+    my $msg_headers = $cmd->{message}->headers;
+
+    if ( $self->{_version} <= 1.1 ) {
+      $cmd_headers->{'message-id'} = $msg_headers->{'message-id'};
+      if ( $self->{_version} > 1.0 ) {
+        $cmd_headers->{subscription} = $msg_headers->{subscription};
+      }
+    }
+    else {
+      $cmd_headers->{id} = $msg_headers->{ack};
+    }
+  }
 
   my $need_receipt;
   if ( exists $NEED_RECEIPT{ $cmd->{name} }
-    || defined $headers->{receipt} )
+    || defined $cmd_headers->{receipt} )
   {
     $need_receipt = 1;
     if ( $cmd->{name} eq 'CONNECT' ) {
       $self->{_pending_receipts}{CONNECTED} = $cmd;
     }
     else {
-      if ( !defined $headers->{receipt}
-        || $headers->{receipt} eq 'auto' )
+      if ( !defined $cmd_headers->{receipt}
+        || $cmd_headers->{receipt} eq 'auto' )
       {
-        $headers->{receipt} = $self->{_session_id} . '@@'
-            . $self->{_receipt_seq}++;
+        $cmd_headers->{receipt} = 'R_' . $self->{_session_id} . '.'
+            . $RECEIPT_SEQ++;
       }
-      $self->{_pending_receipts}{ $headers->{receipt} } = $cmd;
+      $self->{_pending_receipts}{ $cmd_headers->{receipt} } = $cmd;
     }
   }
 
@@ -528,12 +566,12 @@ sub _push_write {
   unless ( defined $body ) {
     $body = '';
   }
-  unless ( defined $headers->{'content-length'} ) {
-    $headers->{'content-length'} = length($body);
+  unless ( defined $cmd_headers->{'content-length'} ) {
+    $cmd_headers->{'content-length'} = length($body);
   }
 
   my $frame_str = $cmd->{name} . EOL;
-  while ( my ( $name, $value ) = each %{$headers} ) {
+  while ( my ( $name, $value ) = each %{$cmd_headers} ) {
     unless ( defined $value ) {
       $value = '';
     }
@@ -606,8 +644,10 @@ sub _login {
           }
         }
 
-        $self->{_ready}      = 1;
-        $self->{_session_id} = $receipt_headers->{session};
+        $self->{_ready} = 1;
+        $self->{_version}
+            = version->parse( $receipt_headers->{version} || 1.0 );
+        $self->{_session_id} = $receipt_headers->{session} || '';
 
         $self->_process_input_queue;
       },
@@ -650,6 +690,36 @@ sub _process_input_queue {
   return;
 }
 
+sub _check_ack {
+  my $self = shift;
+  my $msg  = shift;
+
+  my $msg_headers = $msg->headers;
+  my $sub         = $self->{_subs}{ $msg_headers->{subscription} };
+  my $msg_tag     = $msg_headers->{'message-tag'};
+
+  if ( defined $sub ) {
+    if ( defined $sub->{pending_acks} ) {
+      if ( ref( $sub->{pending_acks} ) eq 'ARRAY' ) {
+        my $i = bsearch_index {
+          $msg_tag > $_ ? -1 : $msg_tag < $_ ? 1 : 0;
+        }
+        @{ $sub->{pending_acks} };
+
+        if ( $i >= 0 ) {
+          splice( @{ $sub->{pending_acks} }, 0, $i + 1 );
+          return 1;
+        }
+      }
+      else {    # HASH
+        return 1 if delete $sub->{pending_acks}{$msg_tag};
+      }
+    }
+  }
+
+  return;
+}
+
 sub _process_frame {
   my $self  = shift;
   my $frame = shift;
@@ -680,9 +750,9 @@ sub _process_message {
 
   my $msg_headers = $msg->headers;
   my $sub_id = $msg_headers->{subscription} || $msg_headers->{destination};
-  my $cmd    = $self->{_subs}{$sub_id};
+  my $sub    = $self->{_subs}{$sub_id};
 
-  unless ( defined $cmd ) {
+  unless ( defined $sub ) {
     my $err = _new_error(
       qq{Don't know how process MESSAGE frame. Unknown subscription "$sub_id"},
       E_UNEXPECTED_DATA
@@ -692,7 +762,19 @@ sub _process_message {
     return;
   }
 
-  $cmd->{on_message}->($msg);
+  my $msg_tag = $MESSAGE_SEQ++;
+  $msg_headers->{'message-tag'} = $msg_tag;
+
+  if ( defined $sub->{pending_acks} ) {
+    if ( ref( $sub->{pending_acks} ) eq 'ARRAY' ) {
+      push( @{ $sub->{pending_acks} }, $msg_tag );
+    }
+    else {    # HASH
+      $sub->{pending_acks}{$msg_tag} = 1;
+    }
+  }
+
+  $sub->{on_message}->($msg);
 
   return;
 }
@@ -715,11 +797,20 @@ sub _process_receipt {
   }
 
   if ( exists $SUBUNSUB_CMDS{ $cmd->{name} } ) {
-    my $headers = $cmd->{headers};
-    my $sub_id  = $headers->{id} || $headers->{destination};
+    my $cmd_headers = $cmd->{headers};
+    my $sub_id = $cmd_headers->{id} || $cmd_headers->{destination};
 
     if ( $cmd->{name} eq 'SUBSCRIBE' ) {
       $self->{_subs}{$sub_id} = $cmd;
+
+      if ( defined $cmd_headers->{ack} ) {
+        if ( $cmd_headers->{ack} eq 'client' ) {
+          $cmd->{pending_acks} = [];
+        }
+        elsif ( $cmd_headers->{ack} eq 'client-individual' ) {
+          $cmd->{pending_acks} = {};
+        }
+      }
     }
     else {    # UNSUBSCRIBE
       delete $self->{_subs}{$sub_id};
@@ -782,9 +873,9 @@ sub _reset_internals {
   $self->{_connected}       = 0;
   $self->{_login_state}     = S_NEED_DO;
   $self->{_ready}           = 0;
+  $self->{_version}         = undef;
   $self->{_session_id}      = undef;
   $self->{_reconnect_timer} = undef;
-  $self->{_receipt_seq}     = 1;
 
   return;
 }
@@ -818,8 +909,8 @@ sub _abort {
         my $err = _new_error( qq{Subscription "$sub_id" lost: $err_msg},
             $err_code, $err_frame );
 
-        my $cmd = $subs{$sub_id};
-        $cmd->{on_receipt}->( undef, $err );
+        my $sub = $subs{$sub_id};
+        $sub->{on_receipt}->( undef, $err );
       }
     }
 
@@ -1274,12 +1365,14 @@ The method is used to remove an existing subscription.
 The method is used to acknowledge consumption of a message from a subscription
 using C<client> or C<client-individual> acknowledgment. Any messages received
 from such a subscription will not be considered to have been consumed until the
-message has been acknowledged via an C<ack()> method.
+message has been acknowledged via an C<ack()> method. Method C<ack()> must be
+called with required parameter C<message> in which must be specified the
+C<MESSAGE> frame.
 
-  $stomper->ack( id => $ack_id );
+  $stomper->ack( message => $msg );
 
   $stomper->ack(
-    id      => $ack_id,
+    message => $msg,
     receipt => 'auto',
 
     sub {
@@ -1301,12 +1394,14 @@ message has been acknowledged via an C<ack()> method.
 =head2 nack( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The C<nack> method is the opposite of C<ack> method. It is used to tell the
-server that the client did not consume the message.
+server that the client did not consume the message. Method C<nack()> must be
+called with required parameter C<message> in which must be specified the
+C<MESSAGE> frame.
 
-  $stomper->nack( id => $ack_id );
+  $stomper->nack( message => $msg );
 
   $stomper->nack(
-    id      => $ack_id,
+    message => $msg,
     receipt => 'auto',
 
     sub {

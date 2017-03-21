@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.30';
+our $VERSION = '0.31_01';
 
 use AnyEvent::Stomper;
 use AnyEvent::Stomper::Error;
@@ -22,6 +22,17 @@ BEGIN {
 }
 
 use constant \%ERROR_CODES;
+
+my %ACK_CMDS = (
+  ACK  => 1,
+  NACK => 1,
+);
+
+my %CAN_REPEAT = (
+  SEND      => 1,
+  SUBSCRIBE => 1,
+  BEGIN     => 1,
+);
 
 
 sub new {
@@ -218,31 +229,34 @@ sub _prepare {
   my $cmd_name = uc(shift);
   my $args     = shift;
 
-  my %cbs;
+  my %params;
+
   if ( ref( $args->[-1] ) eq 'CODE'
     && scalar @{$args} % 2 > 0 )
   {
     if ( $cmd_name eq 'SUBSCRIBE' ) {
-      $cbs{on_message} = pop @{$args};
+      $params{on_message} = pop @{$args};
     }
     else {
-      $cbs{on_receipt} = pop @{$args};
+      $params{on_receipt} = pop @{$args};
     }
   }
 
   my %headers = @{$args};
-  foreach my $name ( qw( on_receipt on_message on_node_error ) ) {
+
+  foreach my $name ( qw( body on_receipt on_message on_node_error ) ) {
     if ( defined $headers{$name} ) {
-      $cbs{$name} = delete $headers{$name};
+      $params{$name} = delete $headers{$name};
     }
   }
-  my $body = delete $headers{body};
+  if ( exists $ACK_CMDS{$cmd_name} ) {
+    $params{message} = delete $headers{message};
+  }
 
   my $cmd = {
     name    => $cmd_name,
     headers => \%headers,
-    body    => $body,
-    %cbs,
+    %params,
   };
 
   unless ( defined $cmd->{on_receipt} ) {
@@ -281,7 +295,6 @@ sub _execute {
 
       if ( defined $err ) {
         my $err_code = $err->code;
-        $fails_cnt++;
 
         my $on_node_error = $cmd->{on_node_error} || $self->{on_node_error};
         if ( defined $on_node_error ) {
@@ -289,9 +302,10 @@ sub _execute {
           $on_node_error->( $err, $node->host, $node->port );
         }
 
-        if ( $err_code != E_OPRN_ERROR
+        if ( $CAN_REPEAT{ $cmd->{name} }
+          && $err_code != E_OPRN_ERROR
           && $err_code != E_CONN_CLOSED_BY_CLIENT
-          && $fails_cnt < scalar @{ $self->{_nodes} } )
+          && ++$fails_cnt < scalar @{ $self->{_nodes} } )
         {
           $self->_execute( $cmd, $fails_cnt );
           return;
@@ -304,6 +318,10 @@ sub _execute {
 
       $cmd->{on_receipt}->($receipt);
     },
+
+    defined $cmd->{message}
+    ? ( message => $cmd->{message} )
+    : (),
 
     defined $cmd->{on_message}
     ? ( on_message => $cmd->{on_message} )
@@ -773,12 +791,14 @@ The method is used to remove an existing subscription.
 The method is used to acknowledge consumption of a message from a subscription
 using C<client> or C<client-individual> acknowledgment. Any messages received
 from such a subscription will not be considered to have been consumed until the
-message has been acknowledged via an C<ack()> method.
+message has been acknowledged via an C<ack()> method. Method C<ack()> must be
+called with required parameter C<message> in which must be specified the
+C<MESSAGE> frame.
 
-  $cluster->ack( id => $ack_id );
+  $stomper->ack( message => $msg );
 
-  $cluster->ack(
-    id      => $ack_id,
+  $stomper->ack(
+    message => $msg,
     receipt => 'auto',
 
     sub {
@@ -800,12 +820,14 @@ message has been acknowledged via an C<ack()> method.
 =head2 nack( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The C<nack> method is the opposite of C<ack> method. It is used to tell the
-server that the client did not consume the message.
+server that the client did not consume the message. Method C<nack()> must be
+called with required parameter C<message> in which must be specified the
+C<MESSAGE> frame.
 
-  $cluster->nack( id => $ack_id );
+  $stomper->nack( message => $msg );
 
-  $cluster->nack(
-    id      => $ack_id,
+  $stomper->nack(
+    message => $msg,
     receipt => 'auto',
 
     sub {

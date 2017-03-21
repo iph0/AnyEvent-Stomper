@@ -383,12 +383,14 @@ The method is used to remove an existing subscription.
 The method is used to acknowledge consumption of a message from a subscription
 using C<client> or C<client-individual> acknowledgment. Any messages received
 from such a subscription will not be considered to have been consumed until the
-message has been acknowledged via an C<ack()> method.
+message has been acknowledged via an C<ack()> method. Method C<ack()> must be
+called with required parameter C<message> in which must be specified the
+C<MESSAGE> frame.
 
-  $stomper->ack( id => $ack_id );
+  $stomper->ack( message => $msg );
 
   $stomper->ack(
-    id      => $ack_id,
+    message => $msg,
     receipt => 'auto',
 
     sub {
@@ -410,12 +412,14 @@ message has been acknowledged via an C<ack()> method.
 =head2 nack( [ %params ] [, $cb->( $receipt, $err ) ] )
 
 The C<nack> method is the opposite of C<ack> method. It is used to tell the
-server that the client did not consume the message.
+server that the client did not consume the message. Method C<nack()> must be
+called with required parameter C<message> in which must be specified the
+C<MESSAGE> frame.
 
-  $stomper->nack( id => $ack_id );
+  $stomper->nack( message => $msg );
 
   $stomper->nack(
-    id      => $ack_id,
+    message => $msg,
     receipt => 'auto',
 
     sub {
