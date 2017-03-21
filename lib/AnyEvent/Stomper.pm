@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.31_01';
+our $VERSION = '0.31_02';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -695,8 +695,9 @@ sub _check_ack {
   my $msg  = shift;
 
   my $msg_headers = $msg->headers;
-  my $sub         = $self->{_subs}{ $msg_headers->{subscription} };
-  my $msg_tag     = $msg_headers->{'message-tag'};
+  my $sub_id  = $msg_headers->{subscription} || $msg_headers->{destination};
+  my $sub     = $self->{_subs}{$sub_id};
+  my $msg_tag = $msg_headers->{'message-tag'};
 
   if ( defined $sub ) {
     if ( defined $sub->{pending_acks} ) {

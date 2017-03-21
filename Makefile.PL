@@ -9,7 +9,7 @@ WriteMakefile(
   PREREQ_PM        => {
     'AnyEvent'        => '6.01',
     'Scalar::Util'    => '0',
-    'List::MoreUtils' => '0.416',
+    'List::MoreUtils' => '0.410',
     'Carp'            => '0',
     version           => '0.77',
   },
