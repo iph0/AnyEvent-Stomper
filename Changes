@@ -1,5 +1,12 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.32 Wed Mar 22 17:22:49 MSK 2017
+  - Now the client tracks all received messages and outgoing ACKs/NACKs, and do
+    not sent unexpected ACKs/NACKs to the STOMP server.
+  - Improved support of different version of STOMP protocol.
+  - ack() and nack() methods now required "message" parameter.
+  - README.pod replaced by README.md.
+
 0.30 Thu Feb 16 12:48:26 MSK 2017
   - Fix in Changes file.
 
