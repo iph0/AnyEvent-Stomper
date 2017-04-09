@@ -233,10 +233,11 @@ For commands `SUBSCRIBE`, `UNSUBSCRIBE`, `DISCONNECT` the client
 automatically adds `receipt` header for internal usage.
 
 The command callback is called in one of two cases depending on the presence of
-the `receipt` header. First case, when the command was successfully sent to
-the server. Second case, when the `RECEIPT` frame will be received. If any
-error occurred during the command execution, the error object is passed to the
-callback in second argument. Error object is the instance of the class
+the `receipt` header. First case, when the command was successfully written to
+the socket. Second case, when the `RECEIPT` frame will be received. In first
+case `on_receipt` callback can be called synchronously. If any error occurred
+during the command execution, the error object is passed to the callback in
+second argument. Error object is the instance of the class
 [AnyEvent::Stomper::Error](https://metacpan.org/pod/AnyEvent::Stomper::Error).
 
 The command callback is optional. If it is not specified and any error
