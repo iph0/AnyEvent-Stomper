@@ -33,7 +33,6 @@ $timer = AE::timer( 0, 1,
     $stomper->send(
       destination => '/queue/foo',
       persistent  => 'true',
-      receipt     => 'auto',
       body        => $body,
 
       sub {

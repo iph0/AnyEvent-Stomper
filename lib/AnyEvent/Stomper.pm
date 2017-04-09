@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use base qw( Exporter );
 
-our $VERSION = '0.32';
+our $VERSION = '0.33_01';
 
 use AnyEvent::Stomper::Frame;
 use AnyEvent::Stomper::Error;
@@ -122,7 +122,9 @@ sub new {
 
   $self->_reset_internals;
   $self->{_input_queue}      = [];
-  $self->{_temp_queue}       = [];
+  $self->{_temp_input_queue} = [];
+  $self->{_write_queue}      = [];
+  $self->{_temp_write_queue} = [];
   $self->{_pending_receipts} = {};
   $self->{_subs}             = {};
 
@@ -245,6 +247,7 @@ sub _connect {
     on_rtimeout      => $self->_create_on_rtimeout,
     on_eof           => $self->_create_on_eof,
     on_error         => $self->_create_on_handle_error,
+    on_drain         => $self->_create_on_drain,
     on_read          => $self->_create_on_read,
   );
 
@@ -339,6 +342,23 @@ sub _create_on_handle_error {
 
     my $err = _new_error( $err_msg, E_IO );
     $self->_disconnect($err);
+  };
+}
+
+sub _create_on_drain {
+  my $self = shift;
+
+  weaken($self);
+
+  return sub {
+    return unless @{ $self->{_write_queue} };
+
+    $self->{_temp_write_queue} = $self->{_write_queue};
+    $self->{_write_queue} = [];
+
+    while ( my $cmd = shift @{ $self->{_temp_write_queue} } ) {
+      $cmd->{on_receipt}->();
+    }
   };
 }
 
@@ -543,11 +563,9 @@ sub _push_write {
     }
   }
 
-  my $need_receipt;
   if ( exists $NEED_RECEIPT{ $cmd->{name} }
     || defined $cmd_headers->{receipt} )
   {
-    $need_receipt = 1;
     if ( $cmd->{name} eq 'CONNECT' ) {
       $self->{_pending_receipts}{CONNECTED} = $cmd;
     }
@@ -560,6 +578,9 @@ sub _push_write {
       }
       $self->{_pending_receipts}{ $cmd_headers->{receipt} } = $cmd;
     }
+  }
+  else {
+    push( @{ $self->{_write_queue} }, $cmd );
   }
 
   my $body = $cmd->{body};
@@ -580,10 +601,6 @@ sub _push_write {
   $frame_str .= EOL . "$body\0";
 
   $self->{_handle}->push_write($frame_str);
-
-  unless ($need_receipt) {
-    AE::postpone { $cmd->{on_receipt}->() };
-  }
 
   return;
 }
@@ -680,10 +697,10 @@ sub _wtimeout {
 sub _process_input_queue {
   my $self = shift;
 
-  $self->{_temp_queue}  = $self->{_input_queue};
+  $self->{_temp_input_queue}  = $self->{_input_queue};
   $self->{_input_queue} = [];
 
-  while ( my $cmd = shift @{ $self->{_temp_queue} } ) {
+  while ( my $cmd = shift @{ $self->{_temp_input_queue} } ) {
     $self->_push_write($cmd);
   }
 
@@ -889,7 +906,9 @@ sub _abort {
   my %subs            = %{ $self->{_subs} };
 
   $self->{_input_queue}      = [];
-  $self->{_temp_queue}       = [];
+  $self->{_temp_input_queue} = [];
+  $self->{_write_queue}      = [];
+  $self->{_temp_write_queue} = [];
   $self->{_pending_receipts} = {};
   $self->{_subs}             = {};
 
@@ -930,7 +949,9 @@ sub _queued_commands {
 
   return (
     values %{ $self->{_pending_receipts} },
-    @{ $self->{_temp_queue} },
+    @{ $self->{_temp_write_queue} },
+    @{ $self->{_write_queue} },
+    @{ $self->{_temp_input_queue} },
     @{ $self->{_input_queue} },
   );
 }
