@@ -1,5 +1,10 @@
 Revision history for Perl extension AnyEvent::Stomper.
 
+0.34 Mon Apr 10 17:10:00 MSK 2017
+  - Improved reliability. If the "receipt" header not specified, the callback
+    "on_receipt" is guaranteed called after the command was successfully
+    written to the socket, even if the "autocork" parameter is on.
+
 0.32 Wed Mar 22 17:22:49 MSK 2017
   - Now the client tracks all received messages and outgoing ACKs/NACKs, and do
     not sent unexpected ACKs/NACKs to the STOMP server.
